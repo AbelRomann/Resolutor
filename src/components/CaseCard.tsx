@@ -18,21 +18,33 @@ export function CaseCard({ c, onClick, index = 0 }: CaseCardProps) {
       onClick={onClick}
       role="button"
       tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onClick()}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
     >
       <div className="case-card-header">
-        <div className="case-card-title">{c.title || 'Sin título'}</div>
+        <div className="case-card-title">{c.title || 'Sin titulo'}</div>
         <StatusBadge status={c.status} />
       </div>
+
+      {c.assignedToEmail && (
+        <div style={{ fontSize: '0.75rem', color: 'var(--primary)', marginBottom: 6, fontWeight: 500 }}>
+          Asignado: {c.assignedToEmail}
+        </div>
+      )}
+
+      {c.solvedFor && (
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginBottom: 6 }}>
+          Para: {c.solvedFor}
+        </div>
+      )}
 
       {preview && <div className="case-card-preview">{preview}</div>}
 
       <div className="case-card-meta">
         <CategoryBadge category={c.category} />
         <PriorityBadge priority={c.priority} />
-        {c.tags.slice(0, 2).map(t => <span key={t} className="tag">{t}</span>)}
+        {c.tags.slice(0, 2).map((tag) => <span key={tag} className="tag">{tag}</span>)}
         {c.tags.length > 2 && <span className="tag">+{c.tags.length - 2}</span>}
-        <span className="case-date">📅 {formatDate(c.incidentDate)}</span>
+        <span className="case-date">{formatDate(c.incidentDate)}</span>
       </div>
     </div>
   );

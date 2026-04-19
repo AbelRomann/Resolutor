@@ -16,19 +16,19 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
     const byStatus: Record<string, number> = {};
     const byCategory: Record<string, number> = {};
 
-    cases.forEach(c => {
-      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
-      byCategory[c.category] = (byCategory[c.category] || 0) + 1;
+    cases.forEach((currentCase) => {
+      byStatus[currentCase.status] = (byStatus[currentCase.status] || 0) + 1;
+      byCategory[currentCase.category] = (byCategory[currentCase.category] || 0) + 1;
     });
 
-    const resolved = (byStatus['resuelto'] || 0) +
-      (byStatus['resuelto_sin_problemas'] || 0) +
-      (byStatus['resuelto_con_ayuda'] || 0);
+    const resolved = (byStatus.resuelto || 0)
+      + (byStatus.resuelto_sin_problemas || 0)
+      + (byStatus.resuelto_con_ayuda || 0);
 
     const resolvedRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
 
     const catEntries = (Object.keys(byCategory) as CaseCategory[])
-      .map(k => ({ key: k, label: CATEGORY_LABELS[k], count: byCategory[k] }))
+      .map((key) => ({ key, label: CATEGORY_LABELS[key], count: byCategory[key] }))
       .sort((a, b) => b.count - a.count);
 
     const maxCat = catEntries[0]?.count || 1;
@@ -38,7 +38,7 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
 
   const recent = useMemo(
     () => [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5),
-    [cases]
+    [cases],
   );
 
   const TopCard = ({ label, value, sub, icon }: { label: string; value: string | number; sub?: string; icon: string }) => (
@@ -49,8 +49,7 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
       </div>
       {loading
         ? <div className="skeleton" style={{ height: 36, width: 60, marginTop: 8 }} />
-        : <div className="stat-card-value">{value}</div>
-      }
+        : <div className="stat-card-value">{value}</div>}
       {sub && <div className="stat-card-sub">{sub}</div>}
     </div>
   );
@@ -59,41 +58,39 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
     <div className="page-wrap">
       <div className="page-header animate-in">
         <div>
-          <h1 className="page-title">Estadísticas</h1>
-          <p className="page-subtitle">Análisis de tus incidentes registrados</p>
+          <h1 className="page-title">Estadisticas</h1>
+          <p className="page-subtitle">Analisis de tus incidentes registrados</p>
         </div>
         <button className="btn btn-primary" onClick={() => onNavigate('new')}>
           + Nuevo Caso
         </button>
       </div>
 
-      {/* Top stats */}
       <div className="stats-grid">
-        <TopCard label="Total Casos" value={stats.total} icon="📋" />
-        <TopCard label="Resueltos" value={stats.resolved} sub={`${stats.resolvedRate}% del total`} icon="✅" />
-        <TopCard label="En Progreso" value={stats.byStatus['en_progreso'] || 0} icon="⏱️" />
-        <TopCard label="Resuelto con Ayuda" value={stats.byStatus['resuelto_con_ayuda'] || 0} icon="🤝" />
+        <TopCard label="Total Casos" value={stats.total} icon="TC" />
+        <TopCard label="Resueltos" value={stats.resolved} sub={`${stats.resolvedRate}% del total`} icon="OK" />
+        <TopCard label="En Progreso" value={stats.byStatus.en_progreso || 0} icon="IP" />
+        <TopCard label="Resuelto con Ayuda" value={stats.byStatus.resuelto_con_ayuda || 0} icon="AY" />
       </div>
 
-      {/* Category + Activity */}
       <div className="stats-row-2">
         <div className="stats-card-wide animate-in animate-delay-1">
-          <div className="stats-card-title">Casos por Categoría</div>
+          <div className="stats-card-title">Casos por Categoria</div>
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 18, borderRadius: 4 }} />)}
+              {[1, 2, 3].map((item) => <div key={item} className="skeleton" style={{ height: 18, borderRadius: 4 }} />)}
             </div>
           ) : stats.catEntries.length === 0 ? (
             <p style={{ fontSize: '0.83rem', color: 'var(--text-3)' }}>Sin datos disponibles.</p>
           ) : (
             <div>
-              {stats.catEntries.map(e => (
-                <div key={e.key} className="cat-row">
-                  <span className="cat-name">{e.label}</span>
+              {stats.catEntries.map((entry) => (
+                <div key={entry.key} className="cat-row">
+                  <span className="cat-name">{entry.label}</span>
                   <div className="cat-bar-wrap">
-                    <div className="cat-bar" style={{ width: `${(e.count / stats.maxCat) * 100}%` }} />
+                    <div className="cat-bar" style={{ width: `${(entry.count / stats.maxCat) * 100}%` }} />
                   </div>
-                  <span className="cat-count">{e.count}</span>
+                  <span className="cat-count">{entry.count}</span>
                 </div>
               ))}
             </div>
@@ -104,19 +101,19 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
           <div className="stats-card-title">Actividad reciente</div>
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 18, borderRadius: 4 }} />)}
+              {[1, 2, 3].map((item) => <div key={item} className="skeleton" style={{ height: 18, borderRadius: 4 }} />)}
             </div>
           ) : recent.length === 0 ? (
             <p style={{ fontSize: '0.83rem', color: 'var(--text-3)' }}>Sin actividad reciente.</p>
           ) : (
             <div>
-              {recent.map(c => (
-                <div key={c.id} className="activity-item" style={{ cursor: 'pointer' }} onClick={() => onNavigate('detail', c.id)}>
-                  <div className="activity-title">{c.title}</div>
+              {recent.map((currentCase) => (
+                <div key={currentCase.id} className="activity-item" style={{ cursor: 'pointer' }} onClick={() => onNavigate('detail', currentCase.id)}>
+                  <div className="activity-title">{currentCase.title}</div>
                   <div className="activity-meta">
-                    <span>{STATUS_LABELS[c.status as CaseStatus]}</span>
-                    <span>·</span>
-                    <span>{formatDateTime(c.updatedAt)}</span>
+                    <span>{STATUS_LABELS[currentCase.status as CaseStatus]}</span>
+                    <span>.</span>
+                    <span>{formatDateTime(currentCase.updatedAt)}</span>
                   </div>
                 </div>
               ))}
@@ -125,21 +122,20 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
         </div>
       </div>
 
-      {/* Resolution breakdown */}
       <div className="stats-card-wide animate-in animate-delay-3">
-        <div className="stats-card-title">Desglose de resolución</div>
+        <div className="stats-card-title">Desglose de resolucion</div>
         <div className="resolution-grid">
           {[
             { key: 'resuelto_sin_problemas', label: 'Resuelto sin problemas', color: '#16a34a' },
             { key: 'resuelto_con_ayuda', label: 'Resuelto con ayuda', color: '#2563eb' },
             { key: 'en_progreso', label: 'En progreso', color: '#d97706' },
-          ].map(item => (
+          ].map((item) => (
             <div key={item.key} className="resolution-item">
               <div
                 className="resolution-num"
                 style={{ borderColor: item.color, color: item.color }}
               >
-                {loading ? '…' : (stats.byStatus[item.key] || 0)}
+                {loading ? '...' : (stats.byStatus[item.key] || 0)}
               </div>
               <div className="resolution-label">{item.label}</div>
             </div>

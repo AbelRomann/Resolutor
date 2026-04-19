@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
-import { useCases } from '../store/useCasesStore';
 import { CaseCard } from '../components/CaseCard';
+import { useAuth } from '../store/useAuthStore';
+import { useCases } from '../store/useCasesStore';
+import { useTasks } from '../store/useTasksStore';
 import { formatDate } from '../utils/date';
 
 interface DashboardProps {
@@ -8,19 +10,29 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
+  const { user } = useAuth();
   const { cases, loading } = useCases();
+  const { tasks, loading: tasksLoading } = useTasks();
 
   const stats = useMemo(() => ({
     total: cases.length,
-    resueltos: cases.filter(c => c.status.startsWith('resuelto')).length,
-    enProgreso: cases.filter(c => c.status === 'en_progreso').length,
-    pendientes: cases.filter(c => c.status === 'pendiente').length,
-    conAyuda: cases.filter(c => c.status === 'resuelto_con_ayuda').length,
-  }), [cases]);
+    resueltos: cases.filter((c) => c.status.startsWith('resuelto')).length,
+    enProgreso: cases.filter((c) => c.status === 'en_progreso').length,
+    pendientes: cases.filter((c) => c.status === 'pendiente').length,
+    conAyuda: cases.filter((c) => c.status === 'resuelto_con_ayuda').length,
+    misAsignados: cases.filter((c) => c.assignedToId === user?.id).length,
+  }), [cases, user?.id]);
 
-  const recent = useMemo(
+  const taskStats = useMemo(() => ({
+    total: tasks.length,
+    automatizables: tasks.filter((task) => task.executionType === 'automation').length,
+    humanas: tasks.filter((task) => task.executionType === 'human').length,
+    mias: tasks.filter((task) => task.assigneeUserId === user?.id).length,
+  }), [tasks, user?.id]);
+
+  const recentCases = useMemo(
     () => [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6),
-    [cases]
+    [cases],
   );
 
   const resolvedRate = stats.total > 0
@@ -33,7 +45,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <div>
           <h1 className="page-title">Inicio</h1>
           <p className="page-subtitle">
-            {loading ? 'Cargando…' : `${stats.total} caso${stats.total !== 1 ? 's' : ''} registrado${stats.total !== 1 ? 's' : ''}`}
+            {loading ? 'Cargando...' : `${stats.total} caso${stats.total !== 1 ? 's' : ''} registrado${stats.total !== 1 ? 's' : ''}`}
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => onNavigate('new')}>
@@ -41,60 +53,76 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </button>
       </div>
 
-      {/* Quick stats */}
       <div className="dash-grid animate-in animate-delay-1">
         {[
           { label: 'Total Casos', val: stats.total, sub: '', onClick: () => onNavigate('cases') },
           { label: 'Resueltos', val: stats.resueltos, sub: `${resolvedRate}% del total`, onClick: () => onNavigate('cases') },
           { label: 'En Progreso', val: stats.enProgreso, sub: stats.pendientes > 0 ? `+${stats.pendientes} pendiente${stats.pendientes !== 1 ? 's' : ''}` : '', onClick: () => onNavigate('cases') },
-        ].map((s, i) => (
-          <div key={s.label} className="dash-stat animate-in" style={{ animationDelay: `${0.1 + i * 0.05}s` }} onClick={s.onClick}>
-            <div className="dash-stat-label">{s.label}</div>
-            {loading ? <div className="skeleton" style={{ height: 40, width: 60, marginTop: 8 }} /> : <div className="dash-stat-val">{s.val}</div>}
-            {s.sub && <div className="dash-stat-sub">{s.sub}</div>}
+          { label: 'Mi Trabajo', val: stats.misAsignados, sub: 'Casos asignados a mi', onClick: () => onNavigate('cases') },
+          { label: 'Tareas', val: taskStats.total, sub: tasksLoading ? '' : `${taskStats.automatizables} automatizables`, onClick: () => onNavigate('tasks') },
+        ].map((card, index) => (
+          <div
+            key={card.label}
+            className="dash-stat animate-in"
+            style={{ animationDelay: `${0.1 + index * 0.05}s` }}
+            onClick={card.onClick}
+          >
+            <div className="dash-stat-label">{card.label}</div>
+            {(loading || (card.label === 'Tareas' && tasksLoading))
+              ? <div className="skeleton" style={{ height: 40, width: 60, marginTop: 8 }} />
+              : <div className="dash-stat-val">{card.val}</div>}
+            {card.sub && <div className="dash-stat-sub">{card.sub}</div>}
           </div>
         ))}
       </div>
 
-      {/* Recent cases */}
       <div className="recent-section animate-in animate-delay-2">
         <div className="recent-header">
           <span className="recent-title">Casos recientes</span>
           {cases.length > 0 && (
-            <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('cases')}>Ver todos →</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('cases')}>Ver todos</button>
           )}
         </div>
 
         {loading ? (
           <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[1,2,3].map(i => <div key={i} className="skeleton-card" style={{ animationDelay: `${i*0.05}s` }} />)}
+            {[1, 2, 3].map((item) => <div key={item} className="skeleton-card" style={{ animationDelay: `${item * 0.05}s` }} />)}
           </div>
-        ) : recent.length === 0 ? (
+        ) : recentCases.length === 0 ? (
           <div style={{ padding: '36px 20px', textAlign: 'center' }}>
-            <div className="empty-icon">📭</div>
-            <h3 style={{ fontSize: '0.92rem', color: 'var(--text-2)', marginBottom: 6 }}>Sin casos aún</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-3)', marginBottom: 16 }}>Registra tu primer incidente técnico.</p>
+            <div className="empty-icon">CS</div>
+            <h3 style={{ fontSize: '0.92rem', color: 'var(--text-2)', marginBottom: 6 }}>Sin casos aun</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-3)', marginBottom: 16 }}>Registra tu primer incidente tecnico.</p>
             <button className="btn btn-primary" onClick={() => onNavigate('new')}>+ Crear primer caso</button>
           </div>
         ) : (
           <div className="recent-list">
-            {recent.map((c, i) => (
-              <CaseCard key={c.id} c={c} index={i} onClick={() => onNavigate('detail', c.id)} />
+            {recentCases.map((currentCase, index) => (
+              <CaseCard key={currentCase.id} c={currentCase} index={index} onClick={() => onNavigate('detail', currentCase.id)} />
             ))}
           </div>
         )}
       </div>
 
-      {/* Summary row */}
-      {!loading && cases.length > 0 && (
+      {!loading && (
         <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap' }} className="animate-in animate-delay-3">
-          <div className="card card-pad" style={{ flex: 1, minWidth: 160 }}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Último incidente</div>
-            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{formatDate(recent[0]?.incidentDate)}</div>
-          </div>
+          {recentCases[0] && (
+            <div className="card card-pad" style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Ultimo incidente</div>
+              <div style={{ fontWeight: 700, color: 'var(--text)' }}>{formatDate(recentCases[0].incidentDate)}</div>
+            </div>
+          )}
           <div className="card card-pad" style={{ flex: 1, minWidth: 160 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Resueltos con ayuda</div>
             <div style={{ fontWeight: 700, color: 'var(--text)' }}>{stats.conAyuda}</div>
+          </div>
+          <div className="card card-pad" style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Tareas humanas</div>
+            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{taskStats.humanas}</div>
+          </div>
+          <div className="card card-pad" style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Tareas mias</div>
+            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{taskStats.mias}</div>
           </div>
         </div>
       )}

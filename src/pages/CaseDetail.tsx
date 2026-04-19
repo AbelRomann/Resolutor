@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { CategoryBadge, PriorityBadge, StatusBadge } from '../components/Badges';
 import { useCases } from '../store/useCasesStore';
-import { StatusBadge, CategoryBadge, PriorityBadge } from '../components/Badges';
-import type { CaseStatus } from '../types/case';
+import { useTasks } from '../store/useTasksStore';
+import { useWorkspace } from '../store/useWorkspaceStore';
+import type { CaseStatus, TaskExecutionType, TaskStatus } from '../types/case';
 import { STATUS_LABELS } from '../types/case';
 import { formatDate, formatDateTime } from '../utils/date';
 
@@ -11,12 +13,16 @@ interface CaseDetailProps {
 }
 
 function ConfirmModal({ title, message, confirmLabel, dangerConfirm, onConfirm, onCancel }: {
-  title: string; message: string; confirmLabel: string;
-  dangerConfirm?: boolean; onConfirm: () => void; onCancel: () => void;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  dangerConfirm?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>{title}</h3>
         <p>{message}</p>
         <div className="modal-actions">
@@ -29,25 +35,34 @@ function ConfirmModal({ title, message, confirmLabel, dangerConfirm, onConfirm, 
 }
 
 function StatusModal({ currentStatus, onConfirm, onCancel }: {
-  currentStatus: CaseStatus; onConfirm: (s: CaseStatus, note: string) => void; onCancel: () => void;
+  currentStatus: CaseStatus;
+  onConfirm: (status: CaseStatus, note: string) => void;
+  onCancel: () => void;
 }) {
   const [status, setStatus] = useState<CaseStatus>(currentStatus);
   const [note, setNote] = useState('');
+
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>Cambiar estado</h3>
         <div className="form-group" style={{ marginBottom: 12 }}>
           <label className="form-label">Nuevo estado</label>
-          <select className="form-select" value={status} onChange={e => setStatus(e.target.value as CaseStatus)}>
-            {(Object.keys(STATUS_LABELS) as CaseStatus[]).map(s => (
-              <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value as CaseStatus)}>
+            {(Object.keys(STATUS_LABELS) as CaseStatus[]).map((current) => (
+              <option key={current} value={current}>{STATUS_LABELS[current]}</option>
             ))}
           </select>
         </div>
         <div className="form-group" style={{ marginBottom: 20 }}>
           <label className="form-label">Nota (opcional)</label>
-          <textarea className="form-textarea" rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="¿Por qué cambias el estado?" />
+          <textarea
+            className="form-textarea"
+            rows={3}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Explica por que cambia el estado"
+          />
         </div>
         <div className="modal-actions">
           <button className="btn btn-outline" onClick={onCancel}>Cancelar</button>
@@ -58,22 +73,154 @@ function StatusModal({ currentStatus, onConfirm, onCancel }: {
   );
 }
 
+function TaskModal({ onCancel, onSubmit, memberOptions }: {
+  onCancel: () => void;
+  onSubmit: (input: {
+    title: string;
+    description?: string;
+    executionType: TaskExecutionType;
+    assigneeUserId?: string;
+    assigneeAgent?: string;
+    requiredCapability?: string;
+  }) => Promise<void>;
+  memberOptions: { userId: string; email?: string; role: string }[];
+}) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [executionType, setExecutionType] = useState<TaskExecutionType>('human');
+  const [assigneeUserId, setAssigneeUserId] = useState('');
+  const [assigneeAgent, setAssigneeAgent] = useState('resolver_ai');
+  const [requiredCapability, setRequiredCapability] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      setError('El titulo de la tarea es obligatorio.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await onSubmit({
+        title,
+        description: description || undefined,
+        executionType,
+        assigneeUserId: executionType !== 'automation' ? assigneeUserId || undefined : undefined,
+        assigneeAgent: executionType !== 'human' ? assigneeAgent || undefined : undefined,
+        requiredCapability: requiredCapability || undefined,
+      });
+    } catch (submitError: any) {
+      setError(submitError.message ?? 'No se pudo crear la tarea');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Nueva tarea</h3>
+        <p>Usa tareas para separar trabajo automatizable del trabajo humano.</p>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="form-label">Titulo</label>
+            <input className="form-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Reiniciar servicio y validar impresora" />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="form-label">Descripcion</label>
+            <textarea className="form-textarea" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Objetivo o contexto de la tarea" />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="form-label">Tipo de ejecucion</label>
+            <select className="form-select" value={executionType} onChange={(e) => setExecutionType(e.target.value as TaskExecutionType)}>
+              <option value="human">Humana</option>
+              <option value="automation">Automatizable</option>
+              <option value="hybrid">Hibrida</option>
+            </select>
+          </div>
+
+          {executionType !== 'automation' && (
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Asignar a</label>
+              <select className="form-select" value={assigneeUserId} onChange={(e) => setAssigneeUserId(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {memberOptions.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.email} {member.role === 'owner' ? '(Propietario)' : member.role === 'admin' ? '(Admin)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {executionType !== 'human' && (
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Agente o backend</label>
+              <input className="form-input" value={assigneeAgent} onChange={(e) => setAssigneeAgent(e.target.value)} placeholder="resolver_ai, queue_worker, automation_rule" />
+            </div>
+          )}
+
+          <div className="form-group" style={{ marginBottom: 18 }}>
+            <label className="form-label">Capacidad requerida (opcional)</label>
+            <input className="form-input" value={requiredCapability} onChange={(e) => setRequiredCapability(e.target.value)} placeholder="networking, printer_reset, user_contact" />
+          </div>
+
+          {error && <div className="form-error">{error}</div>}
+
+          <div className="modal-actions">
+            <button type="button" className="btn btn-outline" onClick={onCancel}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Creando...' : 'Crear tarea'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  pending: 'Pendiente',
+  queued: 'En cola',
+  in_progress: 'En progreso',
+  blocked: 'Bloqueada',
+  done: 'Completada',
+  canceled: 'Cancelada',
+};
+
+const EXECUTION_LABELS: Record<TaskExecutionType, string> = {
+  automation: 'Automatizable',
+  human: 'Humana',
+  hybrid: 'Hibrida',
+};
+
 export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   const { getCase, deleteCase, changeStatus } = useCases();
-  const c = getCase(caseId);
+  const { getTasksForCase, addTask, changeTaskStatus } = useTasks();
+  const { fetchMembers } = useWorkspace();
+  const currentCase = getCase(caseId);
   const [showDelete, setShowDelete] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [memberOptions, setMemberOptions] = useState<{ userId: string; email?: string; role: string }[]>([]);
 
-  if (!c) {
+  const caseTasks = useMemo(
+    () => (currentCase ? getTasksForCase(currentCase.id) : []),
+    [currentCase, getTasksForCase],
+  );
+
+  if (!currentCase) {
     return (
       <div className="page-wrap">
         <div className="empty-state animate-in">
-          <div className="empty-icon">🔍</div>
+          <div className="empty-icon">NA</div>
           <h3>Caso no encontrado</h3>
           <p>El caso que buscas no existe o fue eliminado.</p>
           <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => onNavigate('cases')}>
-            ← Volver
+            Volver
           </button>
         </div>
       </div>
@@ -82,13 +229,38 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
 
   const handleDelete = async () => {
     setDeleting(true);
-    await deleteCase(c.id);
+    await deleteCase(currentCase.id);
     onNavigate('cases');
   };
 
   const handleStatus = async (status: CaseStatus, note: string) => {
-    await changeStatus(c.id, status, note);
+    await changeStatus(currentCase.id, status, note);
     setShowStatus(false);
+  };
+
+  const openTaskModal = async () => {
+    const members = await fetchMembers();
+    setMemberOptions(members.map((member) => ({
+      userId: member.userId,
+      email: member.email,
+      role: member.role,
+    })));
+    setShowTaskModal(true);
+  };
+
+  const createCaseTask = async (input: {
+    title: string;
+    description?: string;
+    executionType: TaskExecutionType;
+    assigneeUserId?: string;
+    assigneeAgent?: string;
+    requiredCapability?: string;
+  }) => {
+    await addTask({
+      ...input,
+      caseId: currentCase.id,
+    });
+    setShowTaskModal(false);
   };
 
   const Block = ({ label, content }: { label: string; content: string }) => {
@@ -104,54 +276,106 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   return (
     <div className="page-wrap detail-wrap">
       <div className="page-header animate-in">
-        <button className="btn btn-ghost" onClick={() => onNavigate('cases')}>← Mis Casos</button>
+        <button className="btn btn-ghost" onClick={() => onNavigate('cases')}>Volver a casos</button>
         <div className="detail-actions">
-          <button className="btn btn-outline btn-sm" onClick={() => setShowStatus(true)}>🔄 Estado</button>
-          <button className="btn btn-outline btn-sm" onClick={() => onNavigate('edit', c.id)}>✏️ Editar</button>
+          <button className="btn btn-outline btn-sm" onClick={() => openTaskModal()}>+ Tarea</button>
+          <button className="btn btn-outline btn-sm" onClick={() => setShowStatus(true)}>Estado</button>
+          <button className="btn btn-outline btn-sm" onClick={() => onNavigate('edit', currentCase.id)}>Editar</button>
           <button className="btn btn-danger btn-sm" onClick={() => setShowDelete(true)} disabled={deleting}>
-            {deleting ? '…' : '🗑️'} Eliminar
+            {deleting ? '...' : 'Eliminar'}
           </button>
         </div>
       </div>
 
-      {/* Header */}
       <div className="card detail-header animate-in">
-        <div className="detail-title">{c.title}</div>
+        <div className="detail-title">{currentCase.title}</div>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '14px' }}>
+          {currentCase.creatorEmail && (
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-3)' }}>
+              Creado por: <strong style={{ color: 'var(--text-2)' }}>{currentCase.creatorEmail}</strong>
+            </div>
+          )}
+          {currentCase.assignedToEmail && (
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-3)' }}>
+              Asignado a: <strong style={{ color: 'var(--text-2)' }}>{currentCase.assignedToEmail}</strong>
+            </div>
+          )}
+          {currentCase.solvedFor && (
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-2)' }}>
+              Resuelto para: <strong>{currentCase.solvedFor}</strong>
+            </div>
+          )}
+        </div>
         <div className="detail-badges">
-          <StatusBadge status={c.status} />
-          <CategoryBadge category={c.category} />
-          <PriorityBadge priority={c.priority} />
-          {c.tags.map(t => <span key={t} className="tag">{t}</span>)}
+          <StatusBadge status={currentCase.status} />
+          <CategoryBadge category={currentCase.category} />
+          <PriorityBadge priority={currentCase.priority} />
+          {currentCase.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}
         </div>
         <div className="detail-dates">
-          <div className="detail-date-item">📅 Incidente: <strong style={{ color: 'var(--text)' }}>{formatDate(c.incidentDate)}</strong></div>
-          <div className="detail-date-item">🕐 Registrado: {formatDateTime(c.createdAt)}</div>
-          <div className="detail-date-item">🔄 Actualizado: {formatDateTime(c.updatedAt)}</div>
+          <div className="detail-date-item">Incidente: <strong style={{ color: 'var(--text)' }}>{formatDate(currentCase.incidentDate)}</strong></div>
+          <div className="detail-date-item">Registrado: {formatDateTime(currentCase.createdAt)}</div>
+          <div className="detail-date-item">Actualizado: {formatDateTime(currentCase.updatedAt)}</div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className={c.whatIDid && c.howItWasResolved ? 'detail-grid' : ''}>
-        <Block label="¿Qué hice?" content={c.whatIDid} />
-        <Block label="¿Cómo se resolvió?" content={c.howItWasResolved} />
+      <div className={currentCase.whatIDid && currentCase.howItWasResolved ? 'detail-grid' : ''}>
+        <Block label="Analisis y acciones realizadas" content={currentCase.whatIDid} />
+        <Block label="Resultado, solucion o siguiente paso" content={currentCase.howItWasResolved} />
       </div>
 
-      {/* History */}
-      {c.statusHistory.length > 0 && (
+      <div className="card card-pad detail-section animate-in">
+        <div className="detail-section-label">Tareas derivadas</div>
+        <p style={{ marginTop: 0, color: 'var(--text-3)', fontSize: '0.86rem' }}>
+          Usa tareas para decidir si este caso lo resuelve una persona, una automatizacion o ambos.
+        </p>
+        {caseTasks.length === 0 ? (
+          <div style={{ fontSize: '0.86rem', color: 'var(--text-3)' }}>Este caso aun no tiene tareas.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {caseTasks.map((task) => (
+              <div key={task.id} className="card card-pad">
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{task.title}</div>
+                    {task.description && <div style={{ fontSize: '0.84rem', color: 'var(--text-3)', marginTop: 5 }}>{task.description}</div>}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                      <span className="tag">{EXECUTION_LABELS[task.executionType]}</span>
+                      {task.assigneeEmail && <span className="tag">{task.assigneeEmail}</span>}
+                      {task.assigneeAgent && <span className="tag">{task.assigneeAgent}</span>}
+                    </div>
+                  </div>
+                  <select
+                    className="form-select"
+                    value={task.status}
+                    onChange={(e) => changeTaskStatus(task.id, e.target.value as TaskStatus)}
+                  >
+                    {(Object.keys(TASK_STATUS_LABELS) as TaskStatus[]).map((status) => (
+                      <option key={status} value={status}>{TASK_STATUS_LABELS[status]}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {currentCase.statusHistory.length > 0 && (
         <div className="card card-pad detail-section animate-in">
           <div className="detail-section-label">Historial de estados</div>
           <div className="timeline">
-            {[...c.statusHistory].reverse().map((h, i) => (
-              <div key={i} className="timeline-item">
+            {[...currentCase.statusHistory].reverse().map((item, index) => (
+              <div key={index} className="timeline-item">
                 <div className="timeline-dot" />
                 <div>
                   <div className="timeline-text">
-                    <span style={{ color: 'var(--text-3)' }}>{STATUS_LABELS[h.from]}</span>
-                    {' → '}
-                    <strong>{STATUS_LABELS[h.to]}</strong>
-                    {h.note && <em style={{ color: 'var(--text-3)', marginLeft: 6 }}>"{h.note}"</em>}
+                    <span style={{ color: 'var(--text-3)' }}>{STATUS_LABELS[item.from]}</span>
+                    {' -> '}
+                    <strong>{STATUS_LABELS[item.to]}</strong>
+                    {item.note && <em style={{ color: 'var(--text-3)', marginLeft: 6 }}>"{item.note}"</em>}
                   </div>
-                  <div className="timeline-date">{formatDateTime(h.date)}</div>
+                  <div className="timeline-date">{formatDateTime(item.date)}</div>
                 </div>
               </div>
             ))}
@@ -161,16 +385,21 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
 
       {showDelete && (
         <ConfirmModal
-          title="¿Eliminar este caso?"
-          message={`"${c.title}" será eliminado permanentemente.`}
-          confirmLabel="Sí, eliminar"
+          title="Eliminar caso?"
+          message={`"${currentCase.title}" sera eliminado permanentemente.`}
+          confirmLabel="Si, eliminar"
           dangerConfirm
           onConfirm={handleDelete}
           onCancel={() => setShowDelete(false)}
         />
       )}
+
       {showStatus && (
-        <StatusModal currentStatus={c.status} onConfirm={handleStatus} onCancel={() => setShowStatus(false)} />
+        <StatusModal currentStatus={currentCase.status} onConfirm={handleStatus} onCancel={() => setShowStatus(false)} />
+      )}
+
+      {showTaskModal && (
+        <TaskModal onCancel={() => setShowTaskModal(false)} onSubmit={createCaseTask} memberOptions={memberOptions} />
       )}
     </div>
   );
