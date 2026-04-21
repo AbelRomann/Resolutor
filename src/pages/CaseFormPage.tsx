@@ -11,6 +11,7 @@ import { TagsInput } from '../components/TagsInput';
 import { useCases } from '../store/useCasesStore';
 import { useWorkspace } from '../store/useWorkspaceStore';
 import { todayISO } from '../utils/date';
+import { uploadCaseImageToStorage } from '../utils/storage';
 
 interface CaseFormPageProps {
   editingCase?: Case;
@@ -33,6 +34,7 @@ const EMPTY: CaseFormValues = {
   solvedFor: '',
   assignedToId: '',
   tags: [],
+  imageUrls: [],
 };
 
 export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
@@ -51,7 +53,14 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
     solvedFor: editingCase.solvedFor || '',
     assignedToId: editingCase.assignedToId || '',
     tags: editingCase.tags,
+    imageUrls: editingCase.imageUrls || [],
   } : { ...EMPTY });
+  
+  interface PendingImage {
+    file: File;
+    preview: string;
+  }
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -81,11 +90,21 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
     setSaving(true);
 
     try {
+      let finalImageUrls = [...(form.imageUrls || [])];
+      
+      if (pendingImages.length > 0) {
+        const uploadPromises = pendingImages.map(p => uploadCaseImageToStorage(p.file));
+        const newUrls = await Promise.all(uploadPromises);
+        finalImageUrls = [...finalImageUrls, ...newUrls];
+      }
+      
+      const formToSave = { ...form, imageUrls: finalImageUrls };
+
       if (isEdit) {
-        await updateCase(editingCase.id, form);
+        await updateCase(editingCase.id, formToSave);
         onNavigate('detail', editingCase.id);
       } else {
-        const created = await addCase(form);
+        const created = await addCase(formToSave);
         onNavigate('detail', created.id);
       }
     } catch (saveError: unknown) {
@@ -93,6 +112,17 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const removePendingImage = (index: number) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const removeUploadedImage = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      imageUrls: (prev.imageUrls || []).filter((_, i) => i !== index)
+    }));
   };
 
   return (
@@ -228,7 +258,46 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
         </div>
 
         <div className="form-section animate-in animate-delay-2">
-          <div className="form-section-title">Etiquetas</div>
+          <div className="form-section-title">Archivos y Etiquetas</div>
+          
+          <div className="form-group" style={{ marginBottom: 20 }}>
+            <label className="form-label">Imagenes adjuntas</label>
+            <span className="form-hint" style={{ marginBottom: 8, display: 'block' }}>Sube capturas de pantalla o fotos del error (Max 5MB por imagen).</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              multiple 
+              className="form-input"
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  const newFiles = Array.from(e.target.files).map(file => ({
+                    file,
+                    preview: URL.createObjectURL(file)
+                  }));
+                  setPendingImages(prev => [...prev, ...newFiles]);
+                }
+                e.target.value = ''; // reset
+              }}
+            />
+            
+            {(form.imageUrls && form.imageUrls.length > 0) || pendingImages.length > 0 ? (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
+                {form.imageUrls?.map((url, i) => (
+                  <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img src={url} alt={`Adjunto ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button type="button" onClick={() => removeUploadedImage(i)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>&times;</button>
+                  </div>
+                ))}
+                {pendingImages.map((imgObj, i) => (
+                  <div key={`pending-${i}`} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--primary)' }}>
+                    <img src={imgObj.preview} alt={`Pendiente ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                    <button type="button" onClick={() => removePendingImage(i)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>&times;</button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           <div className="form-group">
             <label className="form-label">Tags</label>
             <span className="form-hint" style={{ marginBottom: 7, display: 'block' }}>Presiona Enter o coma para agregar.</span>

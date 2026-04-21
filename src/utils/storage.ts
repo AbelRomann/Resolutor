@@ -22,6 +22,7 @@ function rowToCase(row: any): Case {
     solvedFor: row.solved_for ?? undefined,
     tags: row.tags ?? [],
     statusHistory: row.status_history ?? [],
+    imageUrls: row.image_urls ?? [],
   };
 }
 
@@ -40,6 +41,7 @@ function caseToRow(c: Omit<Case, 'createdAt' | 'updatedAt' | 'userId' | 'creator
     solved_for: c.solvedFor || null,
     tags: c.tags,
     status_history: c.statusHistory,
+    image_urls: c.imageUrls,
   };
 }
 
@@ -81,6 +83,7 @@ export async function updateCaseInDb(id: string, fields: Partial<Case>): Promise
   if (fields.assignedToId !== undefined) patch.assigned_to = fields.assignedToId || null;
   if (fields.tags !== undefined) patch.tags = fields.tags;
   if (fields.statusHistory !== undefined) patch.status_history = fields.statusHistory;
+  if (fields.imageUrls !== undefined) patch.image_urls = fields.imageUrls;
 
   const { error } = await supabase.from('cases').update(patch).eq('id', id);
   if (error) throw error;
@@ -116,4 +119,24 @@ export function applyStatusChange(c: Case, newStatus: CaseStatus, note?: string)
       { from: c.status, to: newStatus, date: new Date().toISOString(), note },
     ],
   };
+}
+
+export async function uploadCaseImageToStorage(file: File): Promise<string> {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const filePath = `case_images/${fileName}`;
+
+  const { error } = await supabase.storage
+    .from('case-images')
+    .upload(filePath, file);
+
+  if (error) {
+    throw new Error(`Error al subir imagen: ${error.message}`);
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from('case-images')
+    .getPublicUrl(filePath);
+
+  return publicUrlData.publicUrl;
 }

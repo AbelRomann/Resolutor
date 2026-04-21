@@ -206,6 +206,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [memberOptions, setMemberOptions] = useState<{ userId: string; email?: string; role: string }[]>([]);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   const caseTasks = useMemo(
     () => (currentCase ? getTasksForCase(currentCase.id) : []),
@@ -361,6 +362,27 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
         )}
       </div>
 
+      {currentCase.imageUrls && currentCase.imageUrls.length > 0 && (
+        <div className="card card-pad detail-section animate-in">
+          <div className="detail-section-label">Imagenes adjuntas</div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+            {currentCase.imageUrls.map((url, index) => (
+              <div 
+                key={index} 
+                className="card"
+                onClick={() => setViewingImage(url)}
+                style={{ 
+                  width: 100, height: 100, overflow: 'hidden', cursor: 'pointer', 
+                  border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                }}
+              >
+                <img src={url} alt={`Adjunto ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {currentCase.statusHistory.length > 0 && (
         <div className="card card-pad detail-section animate-in">
           <div className="detail-section-label">Historial de estados</div>
@@ -400,6 +422,24 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
 
       {showTaskModal && (
         <TaskModal onCancel={() => setShowTaskModal(false)} onSubmit={createCaseTask} memberOptions={memberOptions} />
+      )}
+
+      {viewingImage && (
+        <div className="modal-overlay" onClick={() => setViewingImage(null)}>
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ position: 'relative', maxWidth: '90%', maxHeight: '90%', display: 'flex', flexDirection: 'column' }}
+          >
+            <button 
+              className="btn btn-outline" 
+              onClick={() => setViewingImage(null)} 
+              style={{ position: 'absolute', top: -40, right: 0, background: 'var(--bg)', zIndex: 10 }}
+            >
+              Cerrar
+            </button>
+            <img src={viewingImage} alt="Visor de adjunto" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }} />
+          </div>
+        </div>
       )}
     </div>
   );

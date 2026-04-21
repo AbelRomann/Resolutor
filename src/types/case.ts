@@ -46,6 +46,7 @@ export interface Case {
   solvedFor?: string;
   tags: string[];
   statusHistory: StatusChange[];
+  imageUrls?: string[];
 }
 
 export interface Workspace {
