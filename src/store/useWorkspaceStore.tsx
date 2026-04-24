@@ -19,7 +19,10 @@ interface WorkspaceContextType {
   error: string | null;
   setActiveWorkspace: (id: string) => void;
   createWorkspace: (name: string) => Promise<Workspace>;
+  renameWorkspace: (workspaceId: string, newName: string) => Promise<void>;
+  deleteWorkspace: (workspaceId: string) => Promise<void>;
   inviteMember: (email: string) => Promise<void>;
+  removeMember: (workspaceId: string, userId: string) => Promise<void>;
   acceptInvitation: (invitationId: string) => Promise<void>;
   rejectInvitation: (invitationId: string) => Promise<void>;
   markNotificationAsRead: (notificationId: string) => Promise<void>;
@@ -295,6 +298,55 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     )));
   };
 
+  const renameWorkspace = async (workspaceId: string, newName: string) => {
+    if (!user?.id) throw new Error('Not authenticated');
+    const trimmed = newName.trim();
+    if (!trimmed) throw new Error('El nombre no puede estar vacío.');
+
+    const { error: updateError } = await supabase
+      .from('workspaces')
+      .update({ name: trimmed })
+      .eq('id', workspaceId)
+      .eq('owner_id', user.id);
+
+    if (updateError) throw updateError;
+
+    setWorkspaces((prev) =>
+      prev.map((ws) => ws.id === workspaceId ? { ...ws, name: trimmed } : ws),
+    );
+  };
+
+  const deleteWorkspace = async (workspaceId: string) => {
+    if (!user?.id) throw new Error('Not authenticated');
+
+    const { error: deleteError } = await supabase
+      .from('workspaces')
+      .delete()
+      .eq('id', workspaceId)
+      .eq('owner_id', user.id);
+
+    if (deleteError) throw deleteError;
+
+    setWorkspaces((prev) => prev.filter((ws) => ws.id !== workspaceId));
+    setActiveWorkspaceId((prev) => {
+      if (prev !== workspaceId) return prev;
+      const remaining = workspaces.filter((ws) => ws.id !== workspaceId);
+      return remaining.length > 0 ? remaining[0].id : null;
+    });
+  };
+
+  const removeMember = async (workspaceId: string, userId: string) => {
+    if (!user?.id) throw new Error('Not authenticated');
+
+    const { error: removeError } = await supabase
+      .from('workspace_members')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId);
+
+    if (removeError) throw removeError;
+  };
+
   const fetchMembers = async () => {
     if (!activeWorkspaceId) return [];
 
@@ -326,7 +378,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       error,
       setActiveWorkspace: setActiveWorkspaceId,
       createWorkspace,
+      renameWorkspace,
+      deleteWorkspace,
       inviteMember,
+      removeMember,
       acceptInvitation,
       rejectInvitation,
       markNotificationAsRead,
