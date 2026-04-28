@@ -16,7 +16,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const stats = useMemo(() => ({
     total: cases.length,
-    resueltos: cases.filter((c) => c.status.startsWith('resuelto')).length,
+    resueltos: cases.filter((c) => c.status?.startsWith('resuelto')).length,
     enProgreso: cases.filter((c) => c.status === 'en_progreso').length,
     pendientes: cases.filter((c) => c.status === 'pendiente').length,
     conAyuda: cases.filter((c) => c.status === 'resuelto_con_ayuda').length,

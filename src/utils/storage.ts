@@ -74,8 +74,8 @@ export async function updateCaseInDb(id: string, fields: Partial<Case>): Promise
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (fields.title !== undefined) patch.title = fields.title;
   if (fields.category !== undefined) patch.category = fields.category;
-  if (fields.status !== undefined) patch.status = fields.status;
-  if (fields.priority !== undefined) patch.priority = fields.priority;
+  if ('status' in fields) patch.status = fields.status ?? null;
+  if ('priority' in fields) patch.priority = fields.priority ?? null;
   if (fields.incidentDate !== undefined) patch.incident_date = fields.incidentDate;
   if (fields.whatIDid !== undefined) patch.what_i_did = fields.whatIDid;
   if (fields.howItWasResolved !== undefined) patch.how_it_was_resolved = fields.howItWasResolved;

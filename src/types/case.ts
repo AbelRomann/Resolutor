@@ -4,21 +4,38 @@ export type CaseStatus =
   | 'resuelto_con_ayuda'
   | 'en_progreso'
   | 'pendiente'
-  | 'descartado';
+  | 'descartado'
+  | null;
 
-export type CasePriority = 'alta' | 'media' | 'baja';
+export type CasePriority = 'alta' | 'media' | 'baja' | null;
 
-export type CaseCategory =
-  | 'reimpresion'
-  | 'conectividad'
-  | 'software'
-  | 'hardware'
-  | 'red'
-  | 'sistema_operativo'
-  | 'impresora'
-  | 'correo'
-  | 'usuario'
-  | 'otro';
+// CaseCategory is now a free-form string (the `key` stored in workspace_categories)
+export type CaseCategory = string;
+
+export interface WorkspaceCategory {
+  id: string;
+  workspaceId: string;
+  key: string;
+  label: string;
+  icon: string;
+  color?: string;
+  position: number;
+  createdAt: string;
+}
+
+/** Default categories seeded for every new workspace. */
+export const DEFAULT_CATEGORIES: Omit<WorkspaceCategory, 'id' | 'workspaceId' | 'createdAt'>[] = [
+  { key: 'software',          label: 'Software',        icon: 'SW', position: 0 },
+  { key: 'hardware',          label: 'Hardware',        icon: 'HW', position: 1 },
+  { key: 'red',               label: 'Red',             icon: 'RD', position: 2 },
+  { key: 'conectividad',      label: 'Conectividad',    icon: 'CN', position: 3 },
+  { key: 'impresora',         label: 'Impresora',       icon: 'IM', position: 4 },
+  { key: 'reimpresion',       label: 'Reimpresión',     icon: 'RP', position: 5 },
+  { key: 'sistema_operativo', label: 'Sis. Operativo',  icon: 'SO', position: 6 },
+  { key: 'correo',            label: 'Correo',          icon: 'CR', position: 7 },
+  { key: 'usuario',           label: 'Usuario',         icon: 'US', position: 8 },
+  { key: 'otro',              label: 'Otro',            icon: 'OT', position: 9 },
+];
 
 export interface StatusChange {
   from: CaseStatus;
@@ -124,7 +141,7 @@ export interface Task {
   updatedAt: string;
 }
 
-export const STATUS_LABELS: Record<CaseStatus, string> = {
+export const STATUS_LABELS: Record<string, string> = {
   resuelto: 'Resuelto',
   resuelto_sin_problemas: 'Resuelto sin problemas',
   resuelto_con_ayuda: 'Resuelto con ayuda',
@@ -133,7 +150,8 @@ export const STATUS_LABELS: Record<CaseStatus, string> = {
   descartado: 'Descartado',
 };
 
-export const CATEGORY_LABELS: Record<CaseCategory, string> = {
+/** @deprecated — use WorkspaceCategory[] from useCategoriesStore instead */
+export const CATEGORY_LABELS: Record<string, string> = {
   reimpresion: 'Reimpresión',
   conectividad: 'Conectividad',
   software: 'Software',
@@ -146,7 +164,7 @@ export const CATEGORY_LABELS: Record<CaseCategory, string> = {
   otro: 'Otro',
 };
 
-export const PRIORITY_LABELS: Record<CasePriority, string> = {
+export const PRIORITY_LABELS: Record<string, string> = {
   alta: 'Alta',
   media: 'Media',
   baja: 'Baja',

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import type {
   Case,
-  CaseCategory,
   CasePriority,
   CaseStatus,
   WorkspaceMember,
 } from '../types/case';
-import { CATEGORY_LABELS, PRIORITY_LABELS, STATUS_LABELS } from '../types/case';
+import { STATUS_LABELS } from '../types/case';
 import { TagsInput } from '../components/TagsInput';
 import { useCases } from '../store/useCasesStore';
+import { useCategories } from '../store/useCategoriesStore';
 import { useWorkspace } from '../store/useWorkspaceStore';
 import { todayISO } from '../utils/date';
 import { uploadCaseImageToStorage } from '../utils/storage';
@@ -23,23 +23,24 @@ type CaseFormValues = Omit<
   'id' | 'createdAt' | 'updatedAt' | 'statusHistory' | 'workspaceId' | 'userId' | 'creatorEmail' | 'assignedToEmail'
 >;
 
-const EMPTY: CaseFormValues = {
+const EMPTY = {
   title: '',
-  category: 'software' as CaseCategory,
-  status: 'en_progreso' as CaseStatus,
-  priority: 'media' as CasePriority,
+  category: 'software',
+  status: null as CaseStatus,
+  priority: null as CasePriority,
   incidentDate: todayISO(),
   whatIDid: '',
   howItWasResolved: '',
   solvedFor: '',
   assignedToId: '',
-  tags: [],
-  imageUrls: [],
+  tags: [] as string[],
+  imageUrls: [] as string[],
 };
 
 export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
   const { addCase, updateCase } = useCases();
   const { fetchMembers, activeWorkspaceId } = useWorkspace();
+  const { categories } = useCategories();
   const isEdit = !!editingCase;
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [form, setForm] = useState<CaseFormValues>(isEdit ? {
@@ -191,28 +192,45 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
           <div className="form-grid-4">
             <div className="form-group">
               <label className="form-label">Categoria <span>*</span></label>
-              <select className="form-select" value={form.category} onChange={(e) => set('category', e.target.value as CaseCategory)}>
-                {(Object.keys(CATEGORY_LABELS) as CaseCategory[]).map((category) => (
-                  <option key={category} value={category}>{CATEGORY_LABELS[category]}</option>
-                ))}
+              <select className="form-select" value={form.category} onChange={(e) => set('category', e.target.value)}>
+                {categories.length === 0 ? (
+                  <option value="otro">Otro</option>
+                ) : (
+                  categories.map((cat) => (
+                    <option key={cat.key} value={cat.key}>{cat.label}</option>
+                  ))
+                )}
               </select>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Estado <span>*</span></label>
-              <select className="form-select" value={form.status} onChange={(e) => set('status', e.target.value as CaseStatus)}>
-                {(Object.keys(STATUS_LABELS) as CaseStatus[]).map((status) => (
-                  <option key={status} value={status}>{STATUS_LABELS[status]}</option>
-                ))}
+              <label className="form-label">Estado</label>
+              <select
+                className="form-select"
+                value={form.status ?? ''}
+                onChange={(e) => set('status', (e.target.value || null) as CaseStatus)}
+              >
+                <option value="">Sin estado</option>
+                <option value="en_progreso">En Progreso</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="resuelto">Resuelto</option>
+                <option value="resuelto_sin_problemas">Resuelto sin problemas</option>
+                <option value="resuelto_con_ayuda">Resuelto con ayuda</option>
+                <option value="descartado">Descartado</option>
               </select>
             </div>
 
             <div className="form-group">
               <label className="form-label">Prioridad</label>
-              <select className="form-select" value={form.priority} onChange={(e) => set('priority', e.target.value as CasePriority)}>
-                {(Object.keys(PRIORITY_LABELS) as CasePriority[]).map((priority) => (
-                  <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
-                ))}
+              <select
+                className="form-select"
+                value={form.priority ?? ''}
+                onChange={(e) => set('priority', (e.target.value || null) as CasePriority)}
+              >
+                <option value="">Sin prioridad</option>
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
               </select>
             </div>
 

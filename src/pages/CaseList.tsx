@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react';
 import { useCases } from '../store/useCasesStore';
+import { useCategories } from '../store/useCategoriesStore';
 import { CaseCard } from '../components/CaseCard';
-import type { CaseStatus, CaseCategory } from '../types/case';
-import { CATEGORY_LABELS, STATUS_LABELS } from '../types/case';
+import type { CaseStatus } from '../types/case';
+import { STATUS_LABELS } from '../types/case';
 
 interface CaseListProps {
   onNavigate: (page: string, id?: string) => void;
 }
 
-const STATUS_COLORS: Record<CaseStatus, string> = {
+const STATUS_COLORS: Record<string, string> = {
   resuelto: '#16a34a',
   resuelto_sin_problemas: '#15803d',
   resuelto_con_ayuda: '#2563eb',
@@ -17,18 +18,18 @@ const STATUS_COLORS: Record<CaseStatus, string> = {
   descartado: '#6b7280',
 };
 
-const CATEGORIES = Object.keys(CATEGORY_LABELS) as CaseCategory[];
-const STATUSES = Object.keys(STATUS_LABELS) as CaseStatus[];
+const STATUSES = Object.keys(STATUS_COLORS);
 
 export function CaseList({ onNavigate }: CaseListProps) {
   const { cases, loading } = useCases();
+  const { categories } = useCategories();
 
   const [search, setSearch] = useState('');
-  const [selectedCats, setSelectedCats] = useState<Set<CaseCategory>>(new Set());
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [selectedStatuses, setSelectedStatuses] = useState<Set<CaseStatus>>(new Set());
   const [sortBy, setSortBy] = useState<'updated' | 'incident' | 'created'>('updated');
 
-  const toggleCat = (cat: CaseCategory) => setSelectedCats(prev => {
+  const toggleCat = (cat: string) => setSelectedCats(prev => {
     const s = new Set(prev);
     s.has(cat) ? s.delete(cat) : s.add(cat);
     return s;
@@ -109,17 +110,17 @@ export function CaseList({ onNavigate }: CaseListProps) {
           <div className="filter-section">
             <div className="filter-section-label">Categoría</div>
             <div className="filter-checkbox-list">
-              {CATEGORIES.map(cat => {
-                const count = cases.filter(c => c.category === cat).length;
+              {categories.map(cat => {
+                const count = cases.filter(c => c.category === cat.key).length;
                 if (count === 0) return null;
                 return (
-                  <label key={cat} className="filter-checkbox">
+                  <label key={cat.key} className="filter-checkbox">
                     <input
                       type="checkbox"
-                      checked={selectedCats.has(cat)}
-                      onChange={() => toggleCat(cat)}
+                      checked={selectedCats.has(cat.key)}
+                      onChange={() => toggleCat(cat.key)}
                     />
-                    <span style={{ flex: 1 }}>{CATEGORY_LABELS[cat]}</span>
+                    <span style={{ flex: 1 }}>{cat.label}</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>{count}</span>
                   </label>
                 );
@@ -146,10 +147,10 @@ export function CaseList({ onNavigate }: CaseListProps) {
                 <label key={st} className="filter-checkbox">
                   <input
                     type="checkbox"
-                    checked={selectedStatuses.has(st)}
-                    onChange={() => toggleStatus(st)}
+                    checked={selectedStatuses.has(st as CaseStatus)}
+                    onChange={() => toggleStatus(st as CaseStatus)}
                   />
-                  <div className="filter-dot" style={{ background: STATUS_COLORS[st] }} />
+                  <div className="filter-dot" style={{ background: STATUS_COLORS[st] ?? '#aaa' }} />
                   <span>{STATUS_LABELS[st]}</span>
                 </label>
               ))}

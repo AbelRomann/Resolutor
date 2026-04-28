@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CategoryBadge, PriorityBadge, StatusBadge } from '../components/Badges';
 import { useCases } from '../store/useCasesStore';
+import { useCategories } from '../store/useCategoriesStore';
 import { useTasks } from '../store/useTasksStore';
 import { useWorkspace } from '../store/useWorkspaceStore';
 import type { CaseStatus, TaskExecutionType, TaskStatus } from '../types/case';
@@ -48,10 +49,18 @@ function StatusModal({ currentStatus, onConfirm, onCancel }: {
         <h3>Cambiar estado</h3>
         <div className="form-group" style={{ marginBottom: 12 }}>
           <label className="form-label">Nuevo estado</label>
-          <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value as CaseStatus)}>
-            {(Object.keys(STATUS_LABELS) as CaseStatus[]).map((current) => (
-              <option key={current} value={current}>{STATUS_LABELS[current]}</option>
-            ))}
+          <select
+            className="form-select"
+            value={status ?? ''}
+            onChange={(e) => setStatus((e.target.value || null) as CaseStatus)}
+          >
+            <option value="">Sin estado</option>
+            <option value="en_progreso">En Progreso</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="resuelto">Resuelto</option>
+            <option value="resuelto_sin_problemas">Resuelto sin problemas</option>
+            <option value="resuelto_con_ayuda">Resuelto con ayuda</option>
+            <option value="descartado">Descartado</option>
           </select>
         </div>
         <div className="form-group" style={{ marginBottom: 20 }}>
@@ -198,9 +207,13 @@ const EXECUTION_LABELS: Record<TaskExecutionType, string> = {
 
 export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   const { getCase, deleteCase, changeStatus } = useCases();
+  const { categories } = useCategories();
   const { getTasksForCase, addTask, changeTaskStatus } = useTasks();
   const { fetchMembers } = useWorkspace();
   const currentCase = getCase(caseId);
+  const categoryLabel = currentCase
+    ? (categories.find((cat) => cat.key === currentCase.category)?.label)
+    : undefined;
   const [showDelete, setShowDelete] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -309,7 +322,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
         </div>
         <div className="detail-badges">
           <StatusBadge status={currentCase.status} />
-          <CategoryBadge category={currentCase.category} />
+          <CategoryBadge category={currentCase.category} categoryLabel={categoryLabel} />
           <PriorityBadge priority={currentCase.priority} />
           {currentCase.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}
         </div>
@@ -392,9 +405,9 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
                 <div className="timeline-dot" />
                 <div>
                   <div className="timeline-text">
-                    <span style={{ color: 'var(--text-3)' }}>{STATUS_LABELS[item.from]}</span>
+                    <span style={{ color: 'var(--text-3)' }}>{item.from ? STATUS_LABELS[item.from] : 'Sin estado'}</span>
                     {' -> '}
-                    <strong>{STATUS_LABELS[item.to]}</strong>
+                    <strong>{item.to ? STATUS_LABELS[item.to] : 'Sin estado'}</strong>
                     {item.note && <em style={{ color: 'var(--text-3)', marginLeft: 6 }}>"{item.note}"</em>}
                   </div>
                   <div className="timeline-date">{formatDateTime(item.date)}</div>

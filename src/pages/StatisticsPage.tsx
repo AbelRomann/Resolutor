@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useCases } from '../store/useCasesStore';
-import type { CaseCategory, CaseStatus } from '../types/case';
-import { CATEGORY_LABELS, STATUS_LABELS } from '../types/case';
+import { useCategories } from '../store/useCategoriesStore';
+import type { CaseStatus } from '../types/case';
+import { STATUS_LABELS } from '../types/case';
 import { formatDateTime } from '../utils/date';
 
 interface StatisticsPageProps {
@@ -10,6 +11,12 @@ interface StatisticsPageProps {
 
 export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
   const { cases, loading } = useCases();
+  const { categories } = useCategories();
+  const categoryLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach((cat) => { map[cat.key] = cat.label; });
+    return map;
+  }, [categories]);
 
   const stats = useMemo(() => {
     const total = cases.length;
@@ -27,8 +34,8 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
 
     const resolvedRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
 
-    const catEntries = (Object.keys(byCategory) as CaseCategory[])
-      .map((key) => ({ key, label: CATEGORY_LABELS[key], count: byCategory[key] }))
+    const catEntries = (Object.keys(byCategory))
+      .map((key) => ({ key, label: categoryLabelMap[key] ?? key, count: byCategory[key] }))
       .sort((a, b) => b.count - a.count);
 
     const maxCat = catEntries[0]?.count || 1;

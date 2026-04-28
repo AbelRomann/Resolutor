@@ -2,6 +2,7 @@ import './index.css';
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './store/useAuthStore';
 import { WorkspaceProvider } from './store/useWorkspaceStore';
+import { CategoriesProvider } from './store/useCategoriesStore';
 import { CasesProvider, useCases } from './store/useCasesStore';
 import { TasksProvider } from './store/useTasksStore';
 import { TopNav } from './components/TopNav';
@@ -97,11 +98,13 @@ function AuthGate() {
 
   return (
     <WorkspaceProvider>
-      <CasesProvider>
-        <TasksProvider>
-          <AppInner />
-        </TasksProvider>
-      </CasesProvider>
+      <CategoriesProvider>
+        <CasesProvider>
+          <TasksProvider>
+            <AppInner />
+          </TasksProvider>
+        </CasesProvider>
+      </CategoriesProvider>
     </WorkspaceProvider>
   );
 }

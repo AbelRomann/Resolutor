@@ -1,6 +1,7 @@
 import type { Case } from '../types/case';
 import { StatusBadge, CategoryBadge, PriorityBadge } from './Badges';
 import { formatDate } from '../utils/date';
+import { useCategories } from '../store/useCategoriesStore';
 
 interface CaseCardProps {
   c: Case;
@@ -9,7 +10,9 @@ interface CaseCardProps {
 }
 
 export function CaseCard({ c, onClick, index = 0 }: CaseCardProps) {
+  const { categories } = useCategories();
   const preview = c.whatIDid || c.howItWasResolved || '';
+  const categoryLabel = categories.find((cat) => cat.key === c.category)?.label;
 
   return (
     <div
@@ -40,7 +43,7 @@ export function CaseCard({ c, onClick, index = 0 }: CaseCardProps) {
       {preview && <div className="case-card-preview">{preview}</div>}
 
       <div className="case-card-meta">
-        <CategoryBadge category={c.category} />
+        <CategoryBadge category={c.category} categoryLabel={categoryLabel} />
         <PriorityBadge priority={c.priority} />
         {c.tags.slice(0, 2).map((tag) => <span key={tag} className="tag">{tag}</span>)}
         {c.tags.length > 2 && <span className="tag">+{c.tags.length - 2}</span>}

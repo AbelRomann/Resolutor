@@ -46,6 +46,8 @@
   --s-descartado:          #6b7280;
   --s-descartado-bg:       #f9fafb;
   --s-descartado-border:   #e5e7eb;
+
+  --error: #dc2626;
 }
 
 /* ── Reset ───────────────────────────────────────────── */
@@ -639,16 +641,67 @@ select {
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
 /* ── Categories page ─────────────────────────────────── */
-.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
 .cat-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-lg); padding: 18px; box-shadow: var(--shadow);
-  cursor: pointer; transition: all var(--t);
+  transition: all var(--t); position: relative;
+  display: flex; flex-direction: column; align-items: flex-start;
 }
 .cat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); border-color: var(--accent-border); }
-.cat-card-icon { font-size: 1.5rem; margin-bottom: 8px; }
+.cat-card-icon {
+  width: 42px; height: 42px; border-radius: var(--radius-md);
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: 800; letter-spacing: 0.5px;
+  margin-bottom: 10px; flex-shrink: 0;
+}
 .cat-card-name { font-size: 0.9rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.cat-card-count { font-size: 0.8rem; color: var(--text-3); }
+.cat-card-count { font-size: 0.78rem; color: var(--text-3); }
+
+/* Hover action row */
+.cat-card-actions {
+  display: flex; gap: 6px;
+  margin-top: 12px; opacity: 0;
+  transition: opacity var(--t);
+}
+.cat-card:hover .cat-card-actions { opacity: 1; }
+.cat-card-action-btn {
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; cursor: pointer;
+  background: var(--surface-3);
+  transition: all var(--t);
+}
+.cat-card-action-btn:hover { background: var(--surface); border-color: var(--accent-border); }
+.cat-card-action-btn--danger:hover { background: #fef2f2; border-color: #fecaca; }
+
+/* ── Modal panel (structured version) ───────────────────── */
+.modal-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); width: 100%;
+  animation: fadeInUp 0.2s ease; box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px; border-bottom: 1px solid var(--border);
+}
+.modal-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+.modal-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--text-3);
+  transition: all var(--t); cursor: pointer;
+}
+.modal-close:hover { background: var(--surface-3); color: var(--text); }
+.modal-body { padding: 20px 22px; }
+.modal-footer {
+  padding: 14px 22px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px; justify-content: flex-end;
+  background: var(--surface-2);
+}
 
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 960px) {
