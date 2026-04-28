@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useCases } from '../store/useCasesStore';
 import { useCategories } from '../store/useCategoriesStore';
-import type { CaseStatus } from '../types/case';
 import { STATUS_LABELS } from '../types/case';
 import { formatDateTime } from '../utils/date';
 
@@ -12,6 +11,7 @@ interface StatisticsPageProps {
 export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
   const { cases, loading } = useCases();
   const { categories } = useCategories();
+  const uncategorizedLabel = 'Sin categoria';
   const categoryLabelMap = useMemo(() => {
     const map: Record<string, string> = {};
     categories.forEach((cat) => { map[cat.key] = cat.label; });
@@ -24,8 +24,12 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
     const byCategory: Record<string, number> = {};
 
     cases.forEach((currentCase) => {
-      byStatus[currentCase.status] = (byStatus[currentCase.status] || 0) + 1;
-      byCategory[currentCase.category] = (byCategory[currentCase.category] || 0) + 1;
+      if (currentCase.status) {
+        byStatus[currentCase.status] = (byStatus[currentCase.status] || 0) + 1;
+      }
+
+      const categoryKey = currentCase.category ?? uncategorizedLabel;
+      byCategory[categoryKey] = (byCategory[categoryKey] || 0) + 1;
     });
 
     const resolved = (byStatus.resuelto || 0)
@@ -35,13 +39,17 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
     const resolvedRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
 
     const catEntries = (Object.keys(byCategory))
-      .map((key) => ({ key, label: categoryLabelMap[key] ?? key, count: byCategory[key] }))
+      .map((key) => ({
+        key,
+        label: key === uncategorizedLabel ? uncategorizedLabel : (categoryLabelMap[key] ?? key),
+        count: byCategory[key],
+      }))
       .sort((a, b) => b.count - a.count);
 
     const maxCat = catEntries[0]?.count || 1;
 
     return { total, byStatus, resolved, resolvedRate, catEntries, maxCat };
-  }, [cases]);
+  }, [cases, categoryLabelMap, uncategorizedLabel]);
 
   const recent = useMemo(
     () => [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5),
@@ -118,7 +126,7 @@ export function StatisticsPage({ onNavigate }: StatisticsPageProps) {
                 <div key={currentCase.id} className="activity-item" style={{ cursor: 'pointer' }} onClick={() => onNavigate('detail', currentCase.id)}>
                   <div className="activity-title">{currentCase.title}</div>
                   <div className="activity-meta">
-                    <span>{STATUS_LABELS[currentCase.status as CaseStatus]}</span>
+                    <span>{currentCase.status ? STATUS_LABELS[currentCase.status] : 'Sin estado'}</span>
                     <span>.</span>
                     <span>{formatDateTime(currentCase.updatedAt)}</span>
                   </div>
