@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useCases } from '../store/useCasesStore';
 import { useCategories } from '../store/useCategoriesStore';
 import { CaseCard } from '../components/CaseCard';
+import { ExportModal } from '../components/ExportModal';
+import { useExport } from '../hooks/useExport';
 import type { CaseStatus } from '../types/case';
 import { STATUS_LABELS } from '../types/case';
+import type { ExportField, ExportFormat } from '../utils/exportCases';
 
 interface CaseListProps {
   onNavigate: (page: string, id?: string) => void;
@@ -23,22 +26,30 @@ const STATUSES = Object.keys(STATUS_COLORS);
 export function CaseList({ onNavigate }: CaseListProps) {
   const { cases, loading } = useCases();
   const { categories } = useCategories();
+  const { runExport, loading: exportLoading, error: exportError, clearError } = useExport();
 
   const [search, setSearch] = useState('');
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [selectedStatuses, setSelectedStatuses] = useState<Set<CaseStatus>>(new Set());
   const [sortBy, setSortBy] = useState<'updated' | 'incident' | 'created'>('updated');
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set());
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportScope, setExportScope] = useState<{ mode: 'all' | 'selected' | 'single'; ids: string[] }>({
+    mode: 'all',
+    ids: [],
+  });
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; caseId: string } | null>(null);
 
-  const toggleCat = (cat: string) => setSelectedCats(prev => {
-    const s = new Set(prev);
-    s.has(cat) ? s.delete(cat) : s.add(cat);
-    return s;
+  const toggleCat = (cat: string) => setSelectedCats((prev) => {
+    const next = new Set(prev);
+    next.has(cat) ? next.delete(cat) : next.add(cat);
+    return next;
   });
 
-  const toggleStatus = (st: CaseStatus) => setSelectedStatuses(prev => {
-    const s = new Set(prev);
-    s.has(st) ? s.delete(st) : s.add(st);
-    return s;
+  const toggleStatus = (status: CaseStatus) => setSelectedStatuses((prev) => {
+    const next = new Set(prev);
+    next.has(status) ? next.delete(status) : next.add(status);
+    return next;
   });
 
   const clearFilters = () => {
@@ -51,24 +62,98 @@ export function CaseList({ onNavigate }: CaseListProps) {
 
   const filtered = useMemo(() => {
     let list = [...cases];
+
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(c =>
-        c.title.toLowerCase().includes(q) ||
-        c.whatIDid.toLowerCase().includes(q) ||
-        c.howItWasResolved.toLowerCase().includes(q) ||
-        c.tags.some(t => t.includes(q))
-      );
+      list = list.filter((item) => (
+        item.title.toLowerCase().includes(q)
+        || item.whatIDid.toLowerCase().includes(q)
+        || item.howItWasResolved.toLowerCase().includes(q)
+        || item.tags.some((tag) => tag.toLowerCase().includes(q))
+      ));
     }
-    if (selectedCats.size > 0) list = list.filter(c => selectedCats.has(c.category));
-    if (selectedStatuses.size > 0) list = list.filter(c => selectedStatuses.has(c.status));
+
+    if (selectedCats.size > 0) {
+      list = list.filter((item) => selectedCats.has(item.category));
+    }
+
+    if (selectedStatuses.size > 0) {
+      list = list.filter((item) => selectedStatuses.has(item.status));
+    }
+
     list.sort((a, b) => {
       if (sortBy === 'incident') return b.incidentDate.localeCompare(a.incidentDate);
       if (sortBy === 'created') return b.createdAt.localeCompare(a.createdAt);
       return b.updatedAt.localeCompare(a.updatedAt);
     });
+
     return list;
   }, [cases, search, selectedCats, selectedStatuses, sortBy]);
+
+  useEffect(() => {
+    setSelectedCaseIds((prev) => new Set([...prev].filter((id) => filtered.some((item) => item.id === id))));
+  }, [filtered]);
+
+  useEffect(() => {
+    const closeContextMenu = () => setContextMenu(null);
+    window.addEventListener('click', closeContextMenu);
+    return () => window.removeEventListener('click', closeContextMenu);
+  }, []);
+
+  const selectedCount = selectedCaseIds.size;
+  const allFilteredSelected = filtered.length > 0 && filtered.every((item) => selectedCaseIds.has(item.id));
+
+  const toggleCaseSelection = (caseId: string, checked: boolean) => {
+    setSelectedCaseIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(caseId);
+      else next.delete(caseId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = (checked: boolean) => {
+    setSelectedCaseIds((prev) => {
+      const next = new Set(prev);
+      filtered.forEach((item) => {
+        if (checked) next.add(item.id);
+        else next.delete(item.id);
+      });
+      return next;
+    });
+  };
+
+  const openExportModal = (mode: 'all' | 'selected' | 'single', ids: string[]) => {
+    clearError();
+    setContextMenu(null);
+    setExportScope({ mode, ids });
+    setShowExportModal(true);
+  };
+
+  const handleExportSubmit = async (input: {
+    format: ExportFormat;
+    fields: ExportField[];
+    includeTasks: boolean;
+    includeNotes: boolean;
+  }) => {
+    await runExport({
+      scope: { type: exportScope.mode, ids: exportScope.ids },
+      ...input,
+      fileBaseName: exportScope.mode === 'single'
+        ? `caso-${exportScope.ids[0]}`
+        : exportScope.mode === 'selected'
+          ? 'casos-seleccionados'
+          : 'casos-workspace',
+    });
+    setShowExportModal(false);
+  };
+
+  const exportCaseCount = exportScope.mode === 'all' ? cases.length : exportScope.ids.length;
+  const exportScopeLabel = exportScope.mode === 'all'
+    ? 'Todos los casos del workspace'
+    : exportScope.mode === 'selected'
+      ? 'Casos seleccionados'
+      : 'Caso individual';
 
   return (
     <div className="page-wrap">
@@ -77,60 +162,76 @@ export function CaseList({ onNavigate }: CaseListProps) {
           <h1 className="page-title">Mis Casos</h1>
           <p className="page-subtitle">
             {loading
-              ? 'Cargando…'
+              ? 'Cargando...'
               : hasFilters
                 ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}`
                 : `${cases.length} caso${cases.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => onNavigate('new')}>
-          + Nuevo Caso
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-outline"
+            onClick={() => openExportModal(
+              selectedCount > 0 ? 'selected' : 'all',
+              selectedCount > 0 ? [...selectedCaseIds] : filtered.map((item) => item.id),
+            )}
+            disabled={!loading && filtered.length === 0}
+          >
+            Exportar
+          </button>
+          <button className="btn btn-primary" onClick={() => onNavigate('new')}>
+            + Nuevo Caso
+          </button>
+        </div>
       </div>
 
       <div className="cases-layout">
-        {/* ── Filter Panel ── */}
         <div className="filter-panel animate-in">
           <div className="filter-title">Filtros</div>
 
-          {/* Search */}
           <div className="filter-section">
             <div className="filter-search-wrap">
-              <span className="filter-search-icon">🔍</span>
+              <span className="filter-search-icon">⌕</span>
               <input
                 className="filter-search"
-                placeholder="Buscar casos…"
+                placeholder="Buscar casos..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(event) => setSearch(event.target.value)}
               />
             </div>
           </div>
 
-          {/* Category */}
           <div className="filter-section">
-            <div className="filter-section-label">Categoría</div>
+            <div className="filter-section-label">Categoria</div>
             <div className="filter-checkbox-list">
-              {categories.map(cat => {
-                const count = cases.filter(c => c.category === cat.key).length;
+              {categories.map((category) => {
+                const count = cases.filter((item) => item.category === category.key).length;
                 if (count === 0) return null;
                 return (
-                  <label key={cat.key} className="filter-checkbox">
+                  <label key={category.key} className="filter-checkbox">
                     <input
                       type="checkbox"
-                      checked={selectedCats.has(cat.key)}
-                      onChange={() => toggleCat(cat.key)}
+                      checked={selectedCats.has(category.key)}
+                      onChange={() => toggleCat(category.key)}
                     />
-                    <span style={{ flex: 1 }}>{cat.label}</span>
+                    <span style={{ flex: 1 }}>{category.label}</span>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>{count}</span>
                   </label>
                 );
               })}
               {cases.length === 0 && (
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
-                  Sin casos aún.{' '}
+                  Sin casos aun.{' '}
                   <button
                     onClick={() => onNavigate('new')}
-                    style={{ color: 'var(--accent)', fontSize: '0.8rem', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                    style={{
+                      color: 'var(--accent)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
                   >
                     Crear uno
                   </button>
@@ -139,66 +240,140 @@ export function CaseList({ onNavigate }: CaseListProps) {
             </div>
           </div>
 
-          {/* Status */}
           <div className="filter-section">
             <div className="filter-section-label">Estado</div>
             <div className="filter-checkbox-list">
-              {STATUSES.map(st => (
-                <label key={st} className="filter-checkbox">
+              {STATUSES.map((status) => (
+                <label key={status} className="filter-checkbox">
                   <input
                     type="checkbox"
-                    checked={selectedStatuses.has(st as CaseStatus)}
-                    onChange={() => toggleStatus(st as CaseStatus)}
+                    checked={selectedStatuses.has(status as CaseStatus)}
+                    onChange={() => toggleStatus(status as CaseStatus)}
                   />
-                  <div className="filter-dot" style={{ background: STATUS_COLORS[st] ?? '#aaa' }} />
-                  <span>{STATUS_LABELS[st]}</span>
+                  <div className="filter-dot" style={{ background: STATUS_COLORS[status] ?? '#aaa' }} />
+                  <span>{STATUS_LABELS[status]}</span>
                 </label>
               ))}
             </div>
           </div>
 
           {hasFilters && (
-            <button className="btn btn-outline btn-sm" onClick={clearFilters} style={{ width: '100%', justifyContent: 'center' }}>
-              ✕ Limpiar filtros
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={clearFilters}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              Limpiar filtros
             </button>
           )}
         </div>
 
-        {/* ── Cases Area ── */}
         <div className="cases-list-area">
           <div className="cases-list-header">
-            <span className="count">{filtered.length} caso{filtered.length !== 1 ? 's' : ''}</span>
-            <select className="sort-select" value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}>
-              <option value="updated">Más reciente</option>
-              <option value="incident">Por incidente</option>
-              <option value="created">Por creación</option>
-            </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span className="count">{filtered.length} caso{filtered.length !== 1 ? 's' : ''}</span>
+              {filtered.length > 0 && (
+                <label className="case-select-all">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={(event) => toggleSelectAllVisible(event.target.checked)}
+                  />
+                  <span>Seleccionar visibles</span>
+                </label>
+              )}
+              {selectedCount > 0 && (
+                <span className="count">{selectedCount} seleccionado{selectedCount !== 1 ? 's' : ''}</span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {selectedCount > 0 && (
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => openExportModal('selected', [...selectedCaseIds])}
+                >
+                  Exportar seleccionados
+                </button>
+              )}
+              <select
+                className="sort-select"
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as typeof sortBy)}
+              >
+                <option value="updated">Mas reciente</option>
+                <option value="incident">Por incidente</option>
+                <option value="created">Por creacion</option>
+              </select>
+            </div>
           </div>
 
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[1,2,3,4].map(i => <div key={i} className="skeleton-card" style={{ animationDelay: `${i*0.05}s` }} />)}
+              {[1, 2, 3, 4].map((item) => (
+                <div key={item} className="skeleton-card" style={{ animationDelay: `${item * 0.05}s` }} />
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="empty-state animate-in">
-              <div className="empty-icon">{cases.length === 0 ? '📭' : '🔍'}</div>
-              <h3>{cases.length === 0 ? 'No cases found' : 'Sin resultados'}</h3>
-              <p>{cases.length === 0 ? 'Crea tu primer caso técnico.' : 'Intenta con otros filtros.'}</p>
+              <div className="empty-icon">{cases.length === 0 ? '🗂' : '⌕'}</div>
+              <h3>{cases.length === 0 ? 'No se encontraron casos' : 'Sin resultados'}</h3>
+              <p>{cases.length === 0 ? 'Crea tu primer caso tecnico.' : 'Intenta con otros filtros.'}</p>
               {cases.length === 0 && (
                 <button className="btn btn-primary" onClick={() => onNavigate('new')}>
-                  Create your first case
+                  Crear el primer caso
                 </button>
               )}
             </div>
           ) : (
             <div className="cases-list">
-              {filtered.map((c, i) => (
-                <CaseCard key={c.id} c={c} index={i} onClick={() => onNavigate('detail', c.id)} />
+              {filtered.map((item, index) => (
+                <CaseCard
+                  key={item.id}
+                  c={item}
+                  index={index}
+                  selectable
+                  selected={selectedCaseIds.has(item.id)}
+                  onToggleSelect={(checked) => toggleCaseSelection(item.id, checked)}
+                  onClick={() => onNavigate('detail', item.id)}
+                  onContextMenu={(x, y) => setContextMenu({ x, y, caseId: item.id })}
+                />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="context-menu-item"
+            onClick={() => openExportModal('single', [contextMenu.caseId])}
+          >
+            Exportar caso
+          </button>
+          <button
+            className="context-menu-item"
+            onClick={() => onNavigate('detail', contextMenu.caseId)}
+          >
+            Abrir detalle
+          </button>
+        </div>
+      )}
+
+      <ExportModal
+        isOpen={showExportModal}
+        scopeLabel={exportScopeLabel}
+        caseCount={exportCaseCount}
+        loading={exportLoading}
+        error={exportError}
+        onClose={() => setShowExportModal(false)}
+        onSubmit={handleExportSubmit}
+      />
     </div>
   );
 }

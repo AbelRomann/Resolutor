@@ -7,9 +7,21 @@ interface CaseCardProps {
   c: Case;
   onClick: () => void;
   index?: number;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (checked: boolean) => void;
+  onContextMenu?: (x: number, y: number) => void;
 }
 
-export function CaseCard({ c, onClick, index = 0 }: CaseCardProps) {
+export function CaseCard({
+  c,
+  onClick,
+  index = 0,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  onContextMenu,
+}: CaseCardProps) {
   const { categories } = useCategories();
   const preview = c.whatIDid || c.howItWasResolved || '';
   const categoryLabel = categories.find((cat) => cat.key === c.category)?.label;
@@ -22,9 +34,26 @@ export function CaseCard({ c, onClick, index = 0 }: CaseCardProps) {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}
+      onContextMenu={(event) => {
+        if (!onContextMenu) return;
+        event.preventDefault();
+        onContextMenu(event.clientX, event.clientY);
+      }}
     >
       <div className="case-card-header">
-        <div className="case-card-title">{c.title || 'Sin titulo'}</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flex: 1 }}>
+          {selectable && (
+            <input
+              type="checkbox"
+              checked={selected}
+              className="case-card-checkbox"
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => onToggleSelect?.(event.target.checked)}
+              aria-label={`Seleccionar ${c.title || 'caso'}`}
+            />
+          )}
+          <div className="case-card-title">{c.title || 'Sin titulo'}</div>
+        </div>
         <StatusBadge status={c.status} />
       </div>
 

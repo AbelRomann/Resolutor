@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
 import { CategoryBadge, PriorityBadge, StatusBadge } from '../components/Badges';
+import { ExportModal } from '../components/ExportModal';
+import { useExport } from '../hooks/useExport';
 import { useCases } from '../store/useCasesStore';
 import { useCategories } from '../store/useCategoriesStore';
 import { useTasks } from '../store/useTasksStore';
 import { useWorkspace } from '../store/useWorkspaceStore';
 import type { CaseStatus, TaskExecutionType, TaskStatus } from '../types/case';
 import { STATUS_LABELS } from '../types/case';
+import type { ExportField, ExportFormat } from '../utils/exportCases';
 import { formatDate, formatDateTime } from '../utils/date';
 
 interface CaseDetailProps {
@@ -210,6 +213,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   const { categories } = useCategories();
   const { getTasksForCase, addTask, changeTaskStatus } = useTasks();
   const { fetchMembers } = useWorkspace();
+  const { runExport, loading: exportLoading, error: exportError, clearError } = useExport();
   const currentCase = getCase(caseId);
   const categoryLabel = currentCase
     ? (categories.find((cat) => cat.key === currentCase.category)?.label)
@@ -220,6 +224,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   const [deleting, setDeleting] = useState(false);
   const [memberOptions, setMemberOptions] = useState<{ userId: string; email?: string; role: string }[]>([]);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const caseTasks = useMemo(
     () => (currentCase ? getTasksForCase(currentCase.id) : []),
@@ -277,6 +282,21 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
     setShowTaskModal(false);
   };
 
+  const handleExport = async (input: {
+    format: ExportFormat;
+    fields: ExportField[];
+    includeTasks: boolean;
+    includeNotes: boolean;
+  }) => {
+    clearError();
+    await runExport({
+      scope: { type: 'single', ids: [currentCase.id] },
+      ...input,
+      fileBaseName: `caso-${currentCase.id}`,
+    });
+    setShowExportModal(false);
+  };
+
   const Block = ({ label, content }: { label: string; content: string }) => {
     if (!content?.trim()) return null;
     return (
@@ -292,6 +312,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
       <div className="page-header animate-in">
         <button className="btn btn-ghost" onClick={() => onNavigate('cases')}>Volver a casos</button>
         <div className="detail-actions">
+          <button className="btn btn-outline btn-sm" onClick={() => setShowExportModal(true)}>Exportar</button>
           <button className="btn btn-outline btn-sm" onClick={() => openTaskModal()}>+ Tarea</button>
           <button className="btn btn-outline btn-sm" onClick={() => setShowStatus(true)}>Estado</button>
           <button className="btn btn-outline btn-sm" onClick={() => onNavigate('edit', currentCase.id)}>Editar</button>
@@ -454,6 +475,16 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
           </div>
         </div>
       )}
+
+      <ExportModal
+        isOpen={showExportModal}
+        scopeLabel="Caso individual"
+        caseCount={1}
+        loading={exportLoading}
+        error={exportError}
+        onClose={() => setShowExportModal(false)}
+        onSubmit={handleExport}
+      />
     </div>
   );
 }
