@@ -162,10 +162,9 @@ select {
   border: 1px solid var(--border);
   font-size: 0.82rem;
   color: var(--text-2);
-  cursor: pointer;
   transition: all var(--t);
   background: var(--surface);
-  max-width: 200px;
+  max-width: 360px;
 }
 .nav-user:hover { border-color: var(--border-2); background: var(--surface-3); color: var(--text); }
 .nav-user-avatar {

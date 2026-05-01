@@ -18,7 +18,7 @@ const navLinks = [
 ];
 
 export function TopNav({ currentPage, onNavigate }: TopNavProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updatePassword } = useAuth();
   const {
     workspaces,
     activeWorkspaceId,
@@ -41,8 +41,14 @@ export function TopNav({ currentPage, onNavigate }: TopNavProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [newWsName, setNewWsName] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [wsError, setWsError] = useState('');
   const [wsSuccess, setWsSuccess] = useState('');
+  const [profilePassword, setProfilePassword] = useState('');
+  const [profilePasswordConfirm, setProfilePasswordConfirm] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
 
   // Management modal state
   const [showManage, setShowManage] = useState(false);
@@ -185,6 +191,48 @@ export function TopNav({ currentPage, onNavigate }: TopNavProps) {
     }
   };
 
+  const openProfile = () => {
+    setProfilePassword('');
+    setProfilePasswordConfirm('');
+    setProfileError('');
+    setProfileSuccess('');
+    setShowProfile(true);
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedPassword = profilePassword.trim();
+    const trimmedConfirm = profilePasswordConfirm.trim();
+
+    setProfileError('');
+    setProfileSuccess('');
+
+    if (trimmedPassword.length < 6) {
+      setProfileError('La nueva contrasena debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (trimmedPassword !== trimmedConfirm) {
+      setProfileError('La confirmacion de la contrasena no coincide.');
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const error = await updatePassword(trimmedPassword);
+      if (error) {
+        setProfileError(error);
+        return;
+      }
+
+      setProfileSuccess('Contrasena actualizada correctamente.');
+      setProfilePassword('');
+      setProfilePasswordConfirm('');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   return (
     <nav className="top-nav">
       <button className="nav-brand" onClick={() => onNavigate('dashboard')}>
@@ -271,11 +319,73 @@ export function TopNav({ currentPage, onNavigate }: TopNavProps) {
 
       <div className="nav-spacer" />
 
-      <div className="nav-user" onClick={signOut} title="Cerrar sesion">
+      <div className="nav-user">
         <div className="nav-user-avatar">{initials}</div>
         <span className="nav-user-email">{user?.email ?? ''}</span>
-        <span style={{ color: 'var(--text-3)', fontSize: '0.75rem' }}>Salir</span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={openProfile}
+          title="Abrir perfil"
+        >
+          Perfil
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={signOut}
+          title="Cerrar sesion"
+        >
+          Salir
+        </button>
       </div>
+
+      {showProfile && (
+        <div className="modal-overlay" onClick={() => setShowProfile(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Perfil</h3>
+            <p>Desde aqui puedes actualizar tu contrasena actual.</p>
+            <form onSubmit={handleUpdatePassword}>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Correo</label>
+                <input className="form-input" value={user?.email ?? ''} disabled />
+              </div>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Nueva contrasena</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={profilePassword}
+                  onChange={(e) => setProfilePassword(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Minimo 6 caracteres"
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="form-label">Confirmar contrasena</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={profilePasswordConfirm}
+                  onChange={(e) => setProfilePasswordConfirm(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder="Repite la nueva contrasena"
+                />
+              </div>
+              {profileError && <div className="form-error">{profileError}</div>}
+              {profileSuccess && <div style={{ color: 'green', fontSize: '0.8rem', marginBottom: 12 }}>{profileSuccess}</div>}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setShowProfile(false)}>
+                  Cerrar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={profileSaving}>
+                  {profileSaving ? 'Guardando...' : 'Cambiar contrasena'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Notifications modal ───────────────────────────── */}
       {showNotifications && (
