@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../store/useAuthStore';
 import { useWorkspace } from '../store/useWorkspaceStore';
-import type { Case, StatusChange, Task } from '../types/case';
+import type { Case, CaseAttachment, StatusChange, Task } from '../types/case';
 import {
   exportCases,
   type ExportAttachmentItem,
@@ -26,6 +26,15 @@ interface RunExportInput {
 }
 
 function mapRowToCase(row: any): Case {
+  const attachments = Array.isArray(row.attachments)
+    ? row.attachments
+    : (row.image_urls ?? []).map((url: string, index: number) => ({
+      name: url.split('/').pop() || `adjunto-${index + 1}`,
+      url,
+      mimeType: 'image/*',
+      size: 0,
+      kind: 'image',
+    }));
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -45,7 +54,8 @@ function mapRowToCase(row: any): Case {
     solvedFor: row.solved_for ?? undefined,
     tags: row.tags ?? [],
     statusHistory: row.status_history ?? [],
-    imageUrls: row.image_urls ?? [],
+    attachments,
+    imageUrls: attachments.filter((attachment: CaseAttachment) => attachment.kind === 'image').map((attachment: CaseAttachment) => attachment.url),
   };
 }
 
@@ -96,20 +106,10 @@ function buildDescription(c: Case): string {
   return sections.join('\n\n');
 }
 
-function attachmentNameFromUrl(url: string, index: number): string {
-  try {
-    const pathname = new URL(url).pathname;
-    const parts = pathname.split('/').filter(Boolean);
-    return parts[parts.length - 1] || `adjunto-${index + 1}`;
-  } catch {
-    return `adjunto-${index + 1}`;
-  }
-}
-
-function buildAttachments(imageUrls: string[] | undefined): ExportAttachmentItem[] {
-  return (imageUrls ?? []).map((url, index) => ({
-    name: attachmentNameFromUrl(url, index),
-    url,
+function buildAttachments(attachments: CaseAttachment[] | undefined): ExportAttachmentItem[] {
+  return (attachments ?? []).map((attachment, index) => ({
+    name: attachment.name || `adjunto-${index + 1}`,
+    url: attachment.url,
   }));
 }
 
@@ -205,7 +205,7 @@ export function useExport() {
           assignedAgent: task.assigneeAgent,
         })),
         notes: includeNotes ? [] : [],
-        attachments: buildAttachments(item.imageUrls),
+        attachments: buildAttachments(item.attachments),
       }));
 
       const workspaceName = workspaces.find((workspace) => workspace.id === activeWorkspaceId)?.name ?? 'Workspace';

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type {
   Case,
+  CaseAttachment,
   CasePriority,
   CaseStatus,
   WorkspaceMember,
@@ -11,7 +12,12 @@ import { useCases } from '../store/useCasesStore';
 import { useCategories } from '../store/useCategoriesStore';
 import { useWorkspace } from '../store/useWorkspaceStore';
 import { todayISO } from '../utils/date';
-import { uploadCaseImageToStorage } from '../utils/storage';
+import {
+  CASE_ATTACHMENT_ACCEPT_ATTR,
+  CASE_ATTACHMENT_MAX_SIZE_LABEL,
+  uploadCaseAttachmentToStorage,
+  validateCaseAttachment,
+} from '../utils/storage';
 
 interface CaseFormPageProps {
   editingCase?: Case;
@@ -34,7 +40,7 @@ const EMPTY = {
   solvedFor: '',
   assignedToId: '',
   tags: [] as string[],
-  imageUrls: [] as string[],
+  attachments: [] as CaseAttachment[],
 };
 
 export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
@@ -54,14 +60,14 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
     solvedFor: editingCase.solvedFor || '',
     assignedToId: editingCase.assignedToId || '',
     tags: editingCase.tags,
-    imageUrls: editingCase.imageUrls || [],
+    attachments: editingCase.attachments || [],
   } : { ...EMPTY });
-  
-  interface PendingImage {
+
+  interface PendingAttachment {
     file: File;
-    preview: string;
+    preview?: string;
   }
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -91,15 +97,15 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
     setSaving(true);
 
     try {
-      let finalImageUrls = [...(form.imageUrls || [])];
-      
-      if (pendingImages.length > 0) {
-        const uploadPromises = pendingImages.map(p => uploadCaseImageToStorage(p.file));
-        const newUrls = await Promise.all(uploadPromises);
-        finalImageUrls = [...finalImageUrls, ...newUrls];
+      let finalAttachments = [...(form.attachments || [])];
+
+      if (pendingAttachments.length > 0) {
+        const uploadPromises = pendingAttachments.map((pendingAttachment) => uploadCaseAttachmentToStorage(pendingAttachment.file));
+        const newAttachments = await Promise.all(uploadPromises);
+        finalAttachments = [...finalAttachments, ...newAttachments];
       }
-      
-      const formToSave = { ...form, imageUrls: finalImageUrls };
+
+      const formToSave = { ...form, attachments: finalAttachments };
 
       if (isEdit) {
         await updateCase(editingCase.id, formToSave);
@@ -115,16 +121,37 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
     }
   };
 
-  const removePendingImage = (index: number) => {
-    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  const removePendingAttachment = (index: number) => {
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
   };
-  
-  const removeUploadedImage = (index: number) => {
-    setForm(prev => ({
+
+  const removeUploadedAttachment = (index: number) => {
+    setForm((prev) => ({
       ...prev,
-      imageUrls: (prev.imageUrls || []).filter((_, i) => i !== index)
+      attachments: (prev.attachments || []).filter((_, i) => i !== index),
     }));
   };
+
+  const formatBytes = (bytes: number) => {
+    if (!bytes) return 'Tamano no disponible';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const attachmentLabel = (attachment: { kind?: string; mimeType?: string; name: string }) => {
+    if (attachment.kind === 'image') return 'Imagen';
+    if (attachment.kind === 'pdf') return 'PDF';
+    if (attachment.kind === 'json') return 'JSON';
+    if (attachment.kind === 'text') return 'TXT';
+    if (attachment.kind === 'csv') return 'CSV';
+    if (attachment.kind === 'spreadsheet') return 'Excel';
+    return attachment.mimeType || 'Archivo';
+  };
+
+  const isImageAttachment = (attachment: { kind?: string; mimeType?: string }) => (
+    attachment.kind === 'image' || attachment.mimeType?.startsWith('image/')
+  );
 
   return (
     <div className="page-wrap form-page-wrap">
@@ -279,37 +306,79 @@ export function CaseFormPage({ editingCase, onNavigate }: CaseFormPageProps) {
           <div className="form-section-title">Archivos y Etiquetas</div>
           
           <div className="form-group" style={{ marginBottom: 20 }}>
-            <label className="form-label">Imagenes adjuntas</label>
-            <span className="form-hint" style={{ marginBottom: 8, display: 'block' }}>Sube capturas de pantalla o fotos del error (Max 5MB por imagen).</span>
-            <input 
-              type="file" 
-              accept="image/*" 
-              multiple 
+            <label className="form-label">Adjuntos</label>
+            <span className="form-hint" style={{ marginBottom: 8, display: 'block' }}>
+              Permite PDF, JSON, TXT, Excel, CSV o imagenes. Maximo {CASE_ATTACHMENT_MAX_SIZE_LABEL} por archivo.
+            </span>
+            <input
+              type="file"
+              accept={CASE_ATTACHMENT_ACCEPT_ATTR}
+              multiple
               className="form-input"
               onChange={(e) => {
                 if (e.target.files && e.target.files.length > 0) {
-                  const newFiles = Array.from(e.target.files).map(file => ({
-                    file,
-                    preview: URL.createObjectURL(file)
-                  }));
-                  setPendingImages(prev => [...prev, ...newFiles]);
+                  try {
+                    const newFiles = Array.from(e.target.files).map((file) => {
+                      validateCaseAttachment(file);
+                      return {
+                        file,
+                        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+                      };
+                    });
+                    setPendingAttachments((prev) => [...prev, ...newFiles]);
+                    setError('');
+                  } catch (attachmentError: any) {
+                    setError(attachmentError.message ?? 'No se pudo adjuntar el archivo.');
+                  }
                 }
-                e.target.value = ''; // reset
+                e.target.value = '';
               }}
             />
-            
-            {(form.imageUrls && form.imageUrls.length > 0) || pendingImages.length > 0 ? (
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-                {form.imageUrls?.map((url, i) => (
-                  <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                    <img src={url} alt={`Adjunto ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <button type="button" onClick={() => removeUploadedImage(i)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>&times;</button>
+
+            {(form.attachments && form.attachments.length > 0) || pendingAttachments.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                {form.attachments?.map((attachment, i) => (
+                  <div key={`${attachment.url}-${i}`} className="card card-pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      {isImageAttachment(attachment) ? (
+                        <img src={attachment.url} alt={attachment.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                      ) : (
+                        <div style={{ width: 56, height: 56, borderRadius: 6, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-2)', flexShrink: 0 }}>
+                          {attachmentLabel(attachment)}
+                        </div>
+                      )}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attachment.name}</div>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-3)' }}>
+                          {attachmentLabel(attachment)}{attachment.size ? ` - ${formatBytes(attachment.size)}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => removeUploadedAttachment(i)}>
+                      Quitar
+                    </button>
                   </div>
                 ))}
-                {pendingImages.map((imgObj, i) => (
-                  <div key={`pending-${i}`} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--primary)' }}>
-                    <img src={imgObj.preview} alt={`Pendiente ${i}`} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-                    <button type="button" onClick={() => removePendingImage(i)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>&times;</button>
+                {pendingAttachments.map((attachment, i) => (
+                  <div key={`pending-${attachment.file.name}-${i}`} className="card card-pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', border: '1px dashed var(--accent-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      {attachment.preview ? (
+                        <img src={attachment.preview} alt={attachment.file.name} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
+                      ) : (
+                        <div style={{ width: 56, height: 56, borderRadius: 6, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-2)', flexShrink: 0 }}>
+                          {attachmentLabel({ name: attachment.file.name, mimeType: attachment.file.type })}
+                        </div>
+                      )}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attachment.file.name}</div>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--text-3)' }}>
+                          Pendiente - {attachmentLabel({ name: attachment.file.name, mimeType: attachment.file.type })} - {formatBytes(attachment.file.size)}
+                        </div>
+                      </div>
+                    </div>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => removePendingAttachment(i)}>
+                      Quitar
+                    </button>
                   </div>
                 ))}
               </div>

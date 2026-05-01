@@ -223,7 +223,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [memberOptions, setMemberOptions] = useState<{ userId: string; email?: string; role: string }[]>([]);
-  const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<{ url: string; name: string } | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
 
   const caseTasks = useMemo(
@@ -305,6 +305,25 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
         <div className="detail-text">{content}</div>
       </div>
     );
+  };
+
+  const attachments = currentCase.attachments ?? [];
+
+  const formatBytes = (bytes: number) => {
+    if (!bytes) return 'Tamano no disponible';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const attachmentLabel = (kind?: string) => {
+    if (kind === 'image') return 'Imagen';
+    if (kind === 'pdf') return 'PDF';
+    if (kind === 'json') return 'JSON';
+    if (kind === 'text') return 'TXT';
+    if (kind === 'csv') return 'CSV';
+    if (kind === 'spreadsheet') return 'Excel';
+    return 'Archivo';
   };
 
   return (
@@ -396,21 +415,45 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
         )}
       </div>
 
-      {currentCase.imageUrls && currentCase.imageUrls.length > 0 && (
+      {attachments.length > 0 && (
         <div className="card card-pad detail-section animate-in">
-          <div className="detail-section-label">Imagenes adjuntas</div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
-            {currentCase.imageUrls.map((url, index) => (
-              <div 
-                key={index} 
-                className="card"
-                onClick={() => setViewingImage(url)}
-                style={{ 
-                  width: 100, height: 100, overflow: 'hidden', cursor: 'pointer', 
-                  border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' 
-                }}
-              >
-                <img src={url} alt={`Adjunto ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div className="detail-section-label">Adjuntos</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+            {attachments.map((attachment, index) => (
+              <div key={`${attachment.url}-${index}`} className="card card-pad" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  {attachment.kind === 'image' ? (
+                    <img
+                      src={attachment.url}
+                      alt={attachment.name}
+                      style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }}
+                      onClick={() => setViewingImage({ url: attachment.url, name: attachment.name })}
+                    />
+                  ) : (
+                    <div style={{ width: 64, height: 64, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)', flexShrink: 0 }}>
+                      {attachmentLabel(attachment.kind)}
+                    </div>
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{attachment.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>
+                      {attachmentLabel(attachment.kind)} - {formatBytes(attachment.size)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {attachment.kind === 'image' && (
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setViewingImage({ url: attachment.url, name: attachment.name })}>
+                      Ver
+                    </button>
+                  )}
+                  <a className="btn btn-outline btn-sm" href={attachment.url} target="_blank" rel="noreferrer">
+                    Abrir
+                  </a>
+                  <a className="btn btn-outline btn-sm" href={attachment.url} download={attachment.name}>
+                    Descargar
+                  </a>
+                </div>
               </div>
             ))}
           </div>
@@ -471,7 +514,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
             >
               Cerrar
             </button>
-            <img src={viewingImage} alt="Visor de adjunto" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }} />
+            <img src={viewingImage.url} alt={viewingImage.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }} />
           </div>
         </div>
       )}

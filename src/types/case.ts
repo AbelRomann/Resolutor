@@ -44,6 +44,17 @@ export interface StatusChange {
   note?: string;
 }
 
+export type CaseAttachmentKind = 'image' | 'pdf' | 'json' | 'text' | 'spreadsheet' | 'csv' | 'file';
+
+export interface CaseAttachment {
+  name: string;
+  url: string;
+  path?: string;
+  mimeType: string;
+  size: number;
+  kind: CaseAttachmentKind;
+}
+
 export interface Case {
   id: string;
   workspaceId: string;
@@ -63,6 +74,7 @@ export interface Case {
   solvedFor?: string;
   tags: string[];
   statusHistory: StatusChange[];
+  attachments?: CaseAttachment[];
   imageUrls?: string[];
 }
 
