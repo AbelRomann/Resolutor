@@ -24,7 +24,9 @@ export function CaseCard({
 }: CaseCardProps) {
   const { categories } = useCategories();
   const preview = c.whatIDid || c.howItWasResolved || '';
-  const categoryLabel = categories.find((cat) => cat.key === c.category)?.label;
+  const category = categories.find((cat) => cat.key === c.category);
+  const categoryLabel = category?.label;
+  const categoryColor = category?.color;
 
   return (
     <div
@@ -72,7 +74,7 @@ export function CaseCard({
       {preview && <div className="case-card-preview">{preview}</div>}
 
       <div className="case-card-meta">
-        <CategoryBadge category={c.category} categoryLabel={categoryLabel} />
+        <CategoryBadge category={c.category} categoryLabel={categoryLabel} color={categoryColor} />
         <PriorityBadge priority={c.priority} />
         {c.tags.slice(0, 2).map((tag) => <span key={tag} className="tag">{tag}</span>)}
         {c.tags.length > 2 && <span className="tag">+{c.tags.length - 2}</span>}

@@ -215,9 +215,11 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
   const { fetchMembers } = useWorkspace();
   const { runExport, loading: exportLoading, error: exportError, clearError } = useExport();
   const currentCase = getCase(caseId);
-  const categoryLabel = currentCase
-    ? (categories.find((cat) => cat.key === currentCase.category)?.label)
+  const category = currentCase
+    ? categories.find((cat) => cat.key === currentCase.category)
     : undefined;
+  const categoryLabel = category?.label;
+  const categoryColor = category?.color;
   const [showDelete, setShowDelete] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -362,7 +364,7 @@ export function CaseDetail({ caseId, onNavigate }: CaseDetailProps) {
         </div>
         <div className="detail-badges">
           <StatusBadge status={currentCase.status} />
-          <CategoryBadge category={currentCase.category} categoryLabel={categoryLabel} />
+          <CategoryBadge category={currentCase.category} categoryLabel={categoryLabel} color={categoryColor} />
           <PriorityBadge priority={currentCase.priority} />
           {currentCase.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}
         </div>
