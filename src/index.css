@@ -821,6 +821,28 @@ select {
   color: var(--text);
 }
 
+/* ── Date filter input ───────────────────────────────── */
+.filter-date-input {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.filter-date-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201,101,52,0.12);
+  background: var(--surface);
+}
+.filter-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  filter: invert(0.3);
+}
+
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 960px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }

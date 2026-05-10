@@ -34,6 +34,8 @@ export function CaseList({ onNavigate, initialCategory }: CaseListProps) {
     () => initialCategory ? new Set([initialCategory]) : new Set()
   );
   const [selectedStatuses, setSelectedStatuses] = useState<Set<CaseStatus>>(new Set());
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
   const [sortBy, setSortBy] = useState<'updated' | 'incident' | 'created'>('updated');
   const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
@@ -55,13 +57,26 @@ export function CaseList({ onNavigate, initialCategory }: CaseListProps) {
     return next;
   });
 
+  const applyDatePreset = (preset: 'today' | '7d' | '30d') => {
+    const now = new Date();
+    const to = now.toISOString().slice(0, 10);
+    let from = '';
+    if (preset === 'today') from = to;
+    else if (preset === '7d')  { now.setDate(now.getDate() - 7);  from = now.toISOString().slice(0, 10); }
+    else if (preset === '30d') { now.setDate(now.getDate() - 30); from = now.toISOString().slice(0, 10); }
+    setDateFrom(from);
+    setDateTo(to);
+  };
+
   const clearFilters = () => {
     setSearch('');
     setSelectedCats(new Set());
     setSelectedStatuses(new Set());
+    setDateFrom('');
+    setDateTo('');
   };
 
-  const hasFilters = search || selectedCats.size > 0 || selectedStatuses.size > 0;
+  const hasFilters = search || selectedCats.size > 0 || selectedStatuses.size > 0 || dateFrom || dateTo;
 
   const filtered = useMemo(() => {
     let list = [...cases];
@@ -84,6 +99,13 @@ export function CaseList({ onNavigate, initialCategory }: CaseListProps) {
       list = list.filter((item) => selectedStatuses.has(item.status));
     }
 
+    if (dateFrom) {
+      list = list.filter((item) => item.incidentDate >= dateFrom);
+    }
+    if (dateTo) {
+      list = list.filter((item) => item.incidentDate <= dateTo);
+    }
+
     list.sort((a, b) => {
       if (sortBy === 'incident') return b.incidentDate.localeCompare(a.incidentDate);
       if (sortBy === 'created') return b.createdAt.localeCompare(a.createdAt);
@@ -91,7 +113,7 @@ export function CaseList({ onNavigate, initialCategory }: CaseListProps) {
     });
 
     return list;
-  }, [cases, search, selectedCats, selectedStatuses, sortBy]);
+  }, [cases, search, selectedCats, selectedStatuses, sortBy, dateFrom, dateTo]);
 
   useEffect(() => {
     setSelectedCaseIds((prev) => new Set([...prev].filter((id) => filtered.some((item) => item.id === id))));
@@ -257,6 +279,44 @@ export function CaseList({ onNavigate, initialCategory }: CaseListProps) {
                   <span>{STATUS_LABELS[status]}</span>
                 </label>
               ))}
+            </div>
+          </div>
+
+          <div className="filter-section">
+            <div className="filter-section-label">Fecha de incidente</div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+              {(['today', '7d', '30d'] as const).map((preset) => (
+                <button
+                  key={preset}
+                  className="btn btn-outline btn-sm"
+                  onClick={() => applyDatePreset(preset)}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: '0.72rem', padding: '3px 6px' }}
+                >
+                  {preset === 'today' ? 'Hoy' : preset === '7d' ? 'Últ. 7d' : 'Últ. 30d'}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>Desde</span>
+                <input
+                  type="date"
+                  className="filter-date-input"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>Hasta</span>
+                <input
+                  type="date"
+                  className="filter-date-input"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
