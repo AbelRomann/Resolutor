@@ -194,9 +194,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     if (memberError) throw memberError;
 
-    // Seed default categories for the new workspace
-    await supabase.rpc('seed_default_categories', { target_workspace: data.id });
-
     const newWorkspace: Workspace = {
       id: data.id,
       name: data.name,

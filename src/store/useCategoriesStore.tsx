@@ -3,10 +3,7 @@ import {
 } from 'react';
 import { supabase } from '../lib/supabase';
 import type { WorkspaceCategory } from '../types/case';
-import { DEFAULT_CATEGORIES } from '../types/case';
 import { useWorkspace } from './useWorkspaceStore';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CategoriesContextType {
   categories: WorkspaceCategory[];
@@ -20,15 +17,11 @@ interface CategoriesContextType {
 
 const CategoriesContext = createContext<CategoriesContextType | null>(null);
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
-
 export function CategoriesProvider({ children }: { children: ReactNode }) {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const [categories, setCategories] = useState<WorkspaceCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // ── Helpers ──────────────────────────────────────────────────────────────
 
   const mapRow = (row: any): WorkspaceCategory => ({
     id: row.id,
@@ -40,27 +33,6 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     position: row.position,
     createdAt: row.created_at,
   });
-
-  // ── Seed defaults (client-side fallback) ─────────────────────────────────
-  // The migration already seeds existing workspaces, but if for some reason
-  // a workspace has no rows we insert the defaults from the client.
-  const seedDefaults = useCallback(async (workspaceId: string) => {
-    const rows = DEFAULT_CATEGORIES.map((cat) => ({
-      workspace_id: workspaceId,
-      key: cat.key,
-      label: cat.label,
-      icon: cat.icon,
-      position: cat.position,
-    }));
-
-    const { error: seedError } = await supabase
-      .from('workspace_categories')
-      .upsert(rows, { onConflict: 'workspace_id,key', ignoreDuplicates: true });
-
-    if (seedError) throw seedError;
-  }, []);
-
-  // ── Fetch ─────────────────────────────────────────────────────────────────
 
   const fetchCategories = useCallback(async () => {
     if (!activeWorkspaceId) {
@@ -79,27 +51,14 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
       if (fetchError) throw fetchError;
 
-      if (!data || data.length === 0) {
-        // No categories yet – seed defaults then reload
-        await seedDefaults(activeWorkspaceId);
-        const { data: seeded, error: seededError } = await supabase
-          .from('workspace_categories')
-          .select('*')
-          .eq('workspace_id', activeWorkspaceId)
-          .order('position', { ascending: true });
-        if (seededError) throw seededError;
-        setCategories((seeded || []).map(mapRow));
-      } else {
-        setCategories(data.map(mapRow));
-      }
-
+      setCategories((data || []).map(mapRow));
       setError(null);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspaceId, seedDefaults]);
+  }, [activeWorkspaceId]);
 
   useEffect(() => {
     if (!wsLoading) {
@@ -107,17 +66,15 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     }
   }, [wsLoading, fetchCategories]);
 
-  // ── CRUD ──────────────────────────────────────────────────────────────────
-
   const addCategory = useCallback(async (data: {
     key: string; label: string; icon: string; color?: string;
   }) => {
     if (!activeWorkspaceId) throw new Error('No active workspace');
 
     const trimmedKey = data.key.trim().toLowerCase().replace(/\s+/g, '_');
-    if (!trimmedKey) throw new Error('El identificador no puede estar vacío.');
-    if (!data.label.trim()) throw new Error('El nombre no puede estar vacío.');
-    if (!data.icon.trim()) throw new Error('El ícono no puede estar vacío.');
+    if (!trimmedKey) throw new Error('El identificador no puede estar vacio.');
+    if (!data.label.trim()) throw new Error('El nombre no puede estar vacio.');
+    if (!data.icon.trim()) throw new Error('El icono no puede estar vacio.');
 
     const nextPosition = categories.length > 0
       ? Math.max(...categories.map((c) => c.position)) + 1
@@ -137,7 +94,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (insertError) {
-      if (insertError.code === '23505') throw new Error('Ya existe una categoría con ese identificador.');
+      if (insertError.code === '23505') throw new Error('Ya existe una categoria con ese identificador.');
       throw insertError;
     }
 
@@ -191,8 +148,6 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     </CategoriesContext.Provider>
   );
 }
-
-// ─── Hook ──────────────────────────────────────────────────────────────────
 
 export function useCategories() {
   const ctx = useContext(CategoriesContext);

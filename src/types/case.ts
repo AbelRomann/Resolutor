@@ -23,20 +23,6 @@ export interface WorkspaceCategory {
   createdAt: string;
 }
 
-/** Default categories seeded for every new workspace. */
-export const DEFAULT_CATEGORIES: Omit<WorkspaceCategory, 'id' | 'workspaceId' | 'createdAt'>[] = [
-  { key: 'software',          label: 'Software',        icon: 'SW', position: 0 },
-  { key: 'hardware',          label: 'Hardware',        icon: 'HW', position: 1 },
-  { key: 'red',               label: 'Red',             icon: 'RD', position: 2 },
-  { key: 'conectividad',      label: 'Conectividad',    icon: 'CN', position: 3 },
-  { key: 'impresora',         label: 'Impresora',       icon: 'IM', position: 4 },
-  { key: 'reimpresion',       label: 'Reimpresión',     icon: 'RP', position: 5 },
-  { key: 'sistema_operativo', label: 'Sis. Operativo',  icon: 'SO', position: 6 },
-  { key: 'correo',            label: 'Correo',          icon: 'CR', position: 7 },
-  { key: 'usuario',           label: 'Usuario',         icon: 'US', position: 8 },
-  { key: 'otro',              label: 'Otro',            icon: 'OT', position: 9 },
-];
-
 export interface StatusChange {
   from: CaseStatus;
   to: CaseStatus;
@@ -162,9 +148,9 @@ export const STATUS_LABELS: Record<string, string> = {
   descartado: 'Descartado',
 };
 
-/** @deprecated — use WorkspaceCategory[] from useCategoriesStore instead */
+/** @deprecated - use WorkspaceCategory[] from useCategoriesStore instead */
 export const CATEGORY_LABELS: Record<string, string> = {
-  reimpresion: 'Reimpresión',
+  reimpresion: 'Reimpresion',
   conectividad: 'Conectividad',
   software: 'Software',
   hardware: 'Hardware',
