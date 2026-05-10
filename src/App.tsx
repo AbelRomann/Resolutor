@@ -33,7 +33,7 @@ function AppInner() {
   const renderPage = () => {
     switch (page) {
       case 'dashboard': return <Dashboard onNavigate={navigate} />;
-      case 'cases': return <CaseList onNavigate={navigate} />;
+      case 'cases': return <CaseList onNavigate={navigate} initialCategory={selectedId} />;
       case 'tasks': return <TasksPage onNavigate={navigate} />;
       case 'categories': return <CategoriesPage onNavigate={navigate} />;
       case 'statistics': return <StatisticsPage onNavigate={navigate} />;

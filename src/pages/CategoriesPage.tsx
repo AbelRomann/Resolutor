@@ -316,7 +316,7 @@ export function CategoriesPage({ onNavigate }: CategoriesPageProps) {
                   <button
                     className="cat-card-action-btn"
                     title="Ver casos"
-                    onClick={() => onNavigate('cases')}
+                    onClick={() => onNavigate('cases', cat.key)}
                   >
                     👁
                   </button>

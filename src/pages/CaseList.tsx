@@ -10,6 +10,7 @@ import type { ExportField, ExportFormat } from '../utils/exportCases';
 
 interface CaseListProps {
   onNavigate: (page: string, id?: string) => void;
+  initialCategory?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -23,13 +24,15 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUSES = Object.keys(STATUS_COLORS);
 
-export function CaseList({ onNavigate }: CaseListProps) {
+export function CaseList({ onNavigate, initialCategory }: CaseListProps) {
   const { cases, loading } = useCases();
   const { categories } = useCategories();
   const { runExport, loading: exportLoading, error: exportError, clearError } = useExport();
 
   const [search, setSearch] = useState('');
-  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(
+    () => initialCategory ? new Set([initialCategory]) : new Set()
+  );
   const [selectedStatuses, setSelectedStatuses] = useState<Set<CaseStatus>>(new Set());
   const [sortBy, setSortBy] = useState<'updated' | 'incident' | 'created'>('updated');
   const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set());
